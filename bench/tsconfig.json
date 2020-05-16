@@ -1,0 +1,6 @@
+{
+  "extends": "../tsconfig",
+  "files": [
+    "./run.ts"
+  ]
+}

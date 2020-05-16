@@ -1,0 +1,24 @@
+{
+  "name": "Https",
+  "description": "A more efficient HTTPS Everywhere",
+  "manifest_version": 2,
+  "version": "1.0.0",
+  "homepage_url": "https://github.com/remusao/https",
+  "author": "remusao",
+  "permissions": [
+    "webRequest",
+    "webRequestBlocking",
+    "<all_urls>",
+    "storage",
+    "unlimitedStorage",
+    "cookies"
+  ],
+  "background": {
+    "scripts": [
+      "background.bundle.js"
+    ]
+  },
+  "browser_action": {
+    "default_title": "HTTPS"
+  }
+}
