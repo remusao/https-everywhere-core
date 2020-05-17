@@ -12,69 +12,66 @@ chrome.browserAction.disable();
 /**
  * Keep track of number of network requests altered for each tab.
  */
-// const counter: Map<number, number> = new Map();
+const counter: Map<number, number> = new Map();
 
 /**
  * Update badge with count for tab with id `tabId` using value from `counter`.
  */
-// function updateBadgeForTab(tabId: number): Promise<void> {
-//   return browser.browserAction.setBadgeText({
-//     text: '' + (counter.get(tabId) || 0),
-//   });
-// }
+function updateBadgeForTab(tabId: number): Promise<void> {
+  return browser.browserAction.setBadgeText({
+    text: '' + (counter.get(tabId) || 0),
+  });
+}
 
 /**
  * Update badge with count for currently active tab using value from `counter`.
  */
-// async function updateBadgeForCurrentTab(): Promise<void> {
-//   const tabs = await browser.tabs.query({ active: true });
-//   if (tabs.length === 1) {
-//     const { id } = tabs[0];
-//     if (id !== undefined) {
-//       await updateBadgeForTab(id);
-//     }
-//   }
-// }
+async function updateBadgeForCurrentTab(): Promise<void> {
+  const tabs = await browser.tabs.query({ active: true });
+  if (tabs.length === 1) {
+    const { id } = tabs[0];
+    if (id !== undefined) {
+      await updateBadgeForTab(id);
+    }
+  }
+}
 
 /**
  * Update badge with count for currently active tab using value from `counter`.
  * This function will also make sure that updates are throttled to not use too
  * much CPU when pages are loading and many network requests are triggered.
  */
-// let TIMER: NodeJS.Timeout | null = null;
-// let INDEX = 0;
-// function updateBadgeThrottled() {
-//   if (TIMER === null) {
-//     TIMER = setTimeout(async () => {
-//       TIMER = null;
-//       browser.browserAction.setIcon({ path: `./spinner${INDEX}.png` });
-//       INDEX = (INDEX + 1) % 4;
-//       await updateBadgeForCurrentTab();
-//     }, 100);
-//   }
-// }
+let TIMER: NodeJS.Timeout | null = null;
+function updateBadgeThrottled() {
+  if (TIMER === null) {
+    TIMER = setTimeout(async () => {
+      TIMER = null;
+      await updateBadgeForCurrentTab();
+    }, 100);
+  }
+}
 
 /**
  * Helper function used to both reset, increment and show the current value of
  * the blocked requests counter for a given tabId.
  */
-// function updateBlockedCounter(tabId: number, { reset = false, incr = false } = {}) {
-//   if (incr) { updateBadgeThrottled(); }
-//   counter.set(
-//     tabId,
-//     (reset ? 0 : (counter.get(tabId) || 0)) + (incr  ? 1 : 0),
-//   );
-// }
-//
-// // Whenever the active tab changes, then we update the count of blocked request
-// browser.tabs.onActivated.addListener(({ tabId }) => updateBadgeForTab(tabId));
-//
-// // Reset counter if tab is reloaded
-// browser.tabs.onUpdated.addListener((tabId, { status, url }) => {
-//   if (status === 'loading' && url === undefined) {
-//     updateBlockedCounter(tabId, { incr: false, reset: true });
-//   }
-// });
+function updateBlockedCounter(tabId: number, { reset = false, incr = false } = {}) {
+  if (incr) { updateBadgeThrottled(); }
+  counter.set(
+    tabId,
+    (reset ? 0 : (counter.get(tabId) || 0)) + (incr  ? 1 : 0),
+  );
+}
+
+// Whenever the active tab changes, then we update the count of blocked request
+browser.tabs.onActivated.addListener(({ tabId }) => updateBadgeForTab(tabId));
+
+// Reset counter if tab is reloaded
+browser.tabs.onUpdated.addListener((tabId, { status, url }) => {
+  if (status === 'loading' && url === undefined) {
+    updateBlockedCounter(tabId, { incr: false, reset: true });
+  }
+});
 
 (async () => {
   // Load from cache (IndexedBD) or pre-built in extension (a serialized engine
@@ -99,6 +96,10 @@ chrome.browserAction.disable();
 
   chrome.webRequest.onBeforeRequest.addListener(
     (details) => {
+      if (details.type === 'main_frame') {
+        updateBlockedCounter(details.tabId, { reset: true, incr: false });
+      }
+
       const rewritten = engine.rewriteToSecureRequest(details.url);
       if (rewritten === null) {
         return {};
@@ -108,6 +109,7 @@ chrome.browserAction.disable();
         from: details.url,
         to: rewritten,
       });
+      updateBlockedCounter(details.tabId, { reset: false, incr: true });
       return { redirectUrl: rewritten };
     },
     { urls: ["*://*/*", "ftp://*/*"] },
