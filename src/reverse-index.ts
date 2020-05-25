@@ -2,7 +2,6 @@ import { StaticDataView, EMPTY_UINT32_ARRAY, sizeOfBytes } from './data-view';
 import { Compression } from './compression';
 
 export interface Indexable {
-  getId: () => number;
   getSerializedSize: (compression: Compression) => number;
   getTokens: () => Uint32Array;
   serialize: (buffer: StaticDataView) => void;
@@ -18,29 +17,6 @@ function nextPow2(v: number): number {
   v |= v >> 16;
   v++;
   return v;
-}
-
-/**
- * Counter implemented on top of Map.
- */
-class Counter<K> {
-  private counter: Map<K, number>;
-
-  constructor() {
-    this.counter = new Map<K, number>();
-  }
-
-  public incr(key: K): void {
-    this.counter.set(key, (this.counter.get(key) || 0) + 1);
-  }
-
-  public get(key: K): number {
-    return this.counter.get(key) || 0;
-  }
-
-  public set(key: K, value: number): void {
-    this.counter.set(key, value);
-  }
 }
 
 /**
@@ -126,13 +102,16 @@ export class Index<T extends Indexable> {
     // appear at any offset of `buffer`. But to be sure we can read back
     // Uint32Array directly from raw buffer, the alignement has to be a
     // multiple of 4. The same alignement is taken care of in `serialize`.
-    const view = StaticDataView.fromUint8Array(buffer.getBytes(true /* align */), compression);
+    const view = StaticDataView.fromUint8Array(
+      buffer.getBytes(true /* align */),
+      compression,
+    );
     const tokensLookupIndex = view.getUint32ArrayView(tokensLookupIndexSize);
     const bucketsIndex = view.getUint32ArrayView(bucketsIndexSize);
     const filtersIndexStart = view.pos;
     view.seekZero(); // not strictly needed but make sure reverse index can be compared with deep equal
 
-    return (new Index([], deserialize, compression)).updateInternals({
+    return new Index([], deserialize, compression).updateInternals({
       bucketsIndex,
       filtersIndexStart,
       numberOfFilters,
@@ -196,15 +175,6 @@ export class Index<T extends Indexable> {
   // `this.deserializeFilter(...)` to do so.
   private readonly deserializeFilter: (view: StaticDataView) => T;
 
-  // Optional function which will be used to optimize a list of filters
-  // in-memory. Typically this is used while matching when a list of filters is
-  // loaded in memory and stored in `this.cache`. Before using the bucket, we
-  // call `this.optimize(...)` on the list of filters to allow some
-  // optimizations to be performed (e.g.: fusion of similar filters, etc.).
-  // Have a look into `./src/engine/optimizer.ts` for examples of such
-  // optimizations.
-  // private readonly optimize: (filters: T[]) => T[];
-  // private readonly config: Readonly<Config>;
   private readonly compression: Compression;
 
   constructor(
@@ -215,12 +185,14 @@ export class Index<T extends Indexable> {
     this.compression = compression;
     this.view = StaticDataView.empty(compression);
     this.deserializeFilter = deserialize;
-    // this.optimize = optimize;
-    // this.config = config;
 
     if (filters.length !== 0) {
-      this.update(filters, undefined);
+      this.update(filters);
     }
+  }
+
+  get size() {
+    return this.numberOfFilters;
   }
 
   /**
@@ -228,34 +200,32 @@ export class Index<T extends Indexable> {
    * the byte array into NetworkFilter or CosmeticFilter instances). This is
    * mostly useful for debugging or testing purposes.
    */
-  public getFilters(): T[] {
-    const filters: T[] = [];
-
+  public *values(): IterableIterator<T> {
     if (this.numberOfFilters === 0) {
-      return filters;
+      return;
     }
 
     // set view cursor at the start of "filters index"
     this.view.setPos(this.filtersIndexStart);
 
     for (let i = 0; i < this.numberOfFilters; i += 1) {
-      filters.push(this.deserializeFilter(this.view));
+      yield this.deserializeFilter(this.view);
     }
-
-    return filters;
   }
 
   /**
    * Return an array of all the tokens currently used as keys of the "buckets index".
    */
-  public getTokens(): Uint32Array {
+  public *keys(): IterableIterator<number> {
     const tokens: Set<number> = new Set();
 
     for (let i = 0; i < this.bucketsIndex.length; i += 2) {
-      tokens.add(this.bucketsIndex[i]);
+      const token = this.bucketsIndex[i];
+      if (tokens.has(token) === false) {
+        yield token;
+        tokens.add(token);
+      }
     }
-
-    return new Uint32Array(tokens);
   }
 
   /**
@@ -287,15 +257,15 @@ export class Index<T extends Indexable> {
    * is instead used as a list of potential candidates (much smaller than the
    * total set of filters; typically between 5 and 10 filters will be checked).
    */
-  public iter(tokens: Uint32Array, cb: (f: T) => boolean): void {
+  public iter(tokens: Uint32Array, cb: (value: T) => boolean): void {
     // Each request is assigned an ID so that we can keep track of the last
     // request seen by each bucket in the reverse index. This provides a cheap
     // way to prevent filters from being inspected more than once per request
     // (which could happen if the same token appears more than once in the URL).
     const requestId = getNextId();
 
-    for (let i = 0; i < tokens.length; i += 1) {
-      if (this.iterBucket(tokens[i], requestId, cb) === false) {
+    for (const token of tokens) {
+      if (this.iterBucket(token, requestId, cb) === false) {
         return;
       }
     }
@@ -310,9 +280,7 @@ export class Index<T extends Indexable> {
    * (as returned by either NetworkFilter.getId() or CosmeticFilter.getId())
    * which need to be removed from the index.
    */
-  public update(newFilters: T[], removedFilters: Set<number> | undefined): void {
-    // TODO - remove multi tokens as each rule/target/exclusion can only be indexed once.
-
+  public update(newFilters: T[]): void {
     // Reset internal cache on each update
     if (this.cache.size !== 0) {
       this.cache.clear();
@@ -320,8 +288,7 @@ export class Index<T extends Indexable> {
 
     let totalNumberOfTokens = 0;
     let totalNumberOfIndexedFilters = 0;
-    const filtersTokens: { filter: T; multiTokens: Uint32Array[] }[] = [];
-    const histogram = new Counter<number>();
+    const filtersTokens: Uint32Array[] = [];
 
     // Keep track of the final size of the buckets index. `bucketsIndexSize` is
     // the number of indexed filters, multiplied by 2 (since we store both the
@@ -331,31 +298,17 @@ export class Index<T extends Indexable> {
     // Re-use the current size of "filters index" as a starting point so that
     // we only need to update with new or removed filters. This saves time if
     // we perform a small update on an existing index.
-    let estimatedBufferSize = this.view.buffer.byteLength - this.filtersIndexStart;
+    let estimatedBufferSize =
+      this.view.buffer.byteLength - this.filtersIndexStart;
 
     // Create a list of all filters which will be part of the index. This means
     // loading existing filters, removing the ones that need to be deleted and
     // adding the new ones.  At the same time, we update the estimation of
     // buffer size needed to store this index.
-    let filters: T[] = this.getFilters();
+    let filters: T[] = [...this.values()];
     if (filters.length !== 0) {
-      // If there is at least one existing filter, then we check if some should
-      // be removed. We subtract their size from the total estimated buffer
-      // size.
-      if (removedFilters !== undefined && removedFilters.size !== 0) {
-        filters = filters.filter((f) => {
-          if (removedFilters.has(f.getId())) {
-            estimatedBufferSize -= f.getSerializedSize(this.compression);
-            return false;
-          }
-
-          return true;
-        });
-      }
-
       // Add new filters to the list and also update estimated size
-      for (let i = 0; i < newFilters.length; i += 1) {
-        const filter = newFilters[i];
+      for (const filter of newFilters) {
         estimatedBufferSize += filter.getSerializedSize(this.compression);
         filters.push(filter);
       }
@@ -364,8 +317,8 @@ export class Index<T extends Indexable> {
       // initialization), then we can take a fast-path and not check removed
       // filters at all. There is also no need to copy the array of filters.
       filters = newFilters;
-      for (let i = 0; i < newFilters.length; i += 1) {
-        estimatedBufferSize += newFilters[i].getSerializedSize(this.compression);
+      for (const filter of newFilters) {
+        estimatedBufferSize += filter.getSerializedSize(this.compression);
       }
     }
 
@@ -381,40 +334,27 @@ export class Index<T extends Indexable> {
       return;
     }
 
-    // When we run in `debug` mode, we enable fully deterministic updates of
-    // internal data-structures. To this effect, we sort all filters before
-    // insertion.
-    // if (this.config.debug === true) {
-    //   filters.sort((f1: T, f2: T): number => f1.getId() - f2.getId());
-    // }
+    const histogram = new Uint32Array(nextPow2(filters.length));
 
     // Tokenize all filters stored in this index. And compute a histogram of
     // tokens so that we can decide how to index each filter efficiently.
-    for (let i = 0; i < filters.length; i += 1) {
-      const filter = filters[i];
-
+    for (const filter of filters) {
       // Tokenize `filter` and store the result in `filtersTokens` which will
       // be used in the next step to select the best token for each filter.
-      const multiTokens = [filter.getTokens()];
-      filtersTokens.push({
-        filter,
-        multiTokens,
-      });
+      const tokens = filter.getTokens();
+      filtersTokens.push(tokens);
 
       // Update estimated size of "buckets index" based on number of times this
       // particular filter will be indexed.
-      bucketsIndexSize += 2 * multiTokens.length; // token + filter index
-      totalNumberOfIndexedFilters += multiTokens.length;
+      bucketsIndexSize += 2;
+      totalNumberOfIndexedFilters += 1;
 
       // Each filter can be indexed more than once, so `getTokens(...)` returns
       // multiple sets of tokens. We iterate on all of them and update the
       // histogram for each.
-      for (let j = 0; j < multiTokens.length; j += 1) {
-        const tokens = multiTokens[j];
-        totalNumberOfTokens += tokens.length;
-        for (let k = 0; k < tokens.length; k += 1) {
-          histogram.incr(tokens[k]);
-        }
+      totalNumberOfTokens += tokens.length;
+      for (const token of tokens) {
+        histogram[token % histogram.length] += 1;
       }
     }
 
@@ -422,7 +362,10 @@ export class Index<T extends Indexable> {
     estimatedBufferSize += bucketsIndexSize * 4;
 
     // Prepare "tokens index" (see documentation in constructor of `Index` class above).
-    const tokensLookupIndexSize: number = Math.max(2, nextPow2(totalNumberOfIndexedFilters));
+    const tokensLookupIndexSize: number = Math.max(
+      2,
+      nextPow2(totalNumberOfIndexedFilters),
+    );
     const mask: number = tokensLookupIndexSize - 1;
     const suffixes: [number, number][][] = [];
     for (let i = 0; i < tokensLookupIndexSize; i += 1) {
@@ -435,7 +378,10 @@ export class Index<T extends Indexable> {
     // At this point we know the number of bytes needed for the compact
     // representation of this reverse index ("tokens index" + "buckets index" +
     // "filters index"). We allocate it at once and proceed with populating it.
-    const buffer = StaticDataView.allocate(estimatedBufferSize, this.compression);
+    const buffer = StaticDataView.allocate(
+      estimatedBufferSize,
+      this.compression,
+    );
     const tokensLookupIndex = buffer.getUint32ArrayView(tokensLookupIndexSize);
     const bucketsIndex = buffer.getUint32ArrayView(bucketsIndexSize);
     const filtersIndexStart = buffer.getPos();
@@ -445,40 +391,34 @@ export class Index<T extends Indexable> {
     // in the same loop and keep track of their indices so that we can later
     // populate "buckets index".
     for (let i = 0; i < filtersTokens.length; i += 1) {
-      const filterTokens = filtersTokens[i];
-      const filter: T = filterTokens.filter;
-      const multiTokens: Uint32Array[] = filterTokens.multiTokens;
+      const tokens = filtersTokens[i];
+      const filter: T = filters[i];
 
       // Serialize this filter and keep track of its index in the byte array;
       // it will be used in "buckets index" to point to this filter.
       const filterIndex = buffer.pos;
       filter.serialize(buffer);
 
-      // Index the filter once per "tokens"
-      for (let j = 0; j < multiTokens.length; j += 1) {
-        const tokens: Uint32Array = multiTokens[j];
+      // Find best token (least seen) from `tokens` using `histogram`.
+      let bestToken: number = 0; // default = wildcard bucket
+      let minCount: number = totalNumberOfTokens + 1;
+      for (const token of tokens) {
+        const tokenCount = histogram[token % histogram.length];
+        if (tokenCount < minCount) {
+          minCount = tokenCount;
+          bestToken = token;
 
-        // Find best token (least seen) from `tokens` using `histogram`.
-        let bestToken: number = 0; // default = wildcard bucket
-        let minCount: number = totalNumberOfTokens + 1;
-        for (let k = 0; k < tokens.length; k += 1) {
-          const tokenCount = histogram.get(tokens[k]);
-          if (tokenCount < minCount) {
-            minCount = tokenCount;
-            bestToken = tokens[k];
-
-            // Fast path, if the current token has only been seen once, we can
-            // stop iterating since we will not find a better alternarive!
-            if (minCount === 1) {
-              break;
-            }
+          // Fast path, if the current token has only been seen once, we can
+          // stop iterating since we will not find a better alternarive!
+          if (minCount === 1) {
+            break;
           }
         }
-
-        // `bestToken & mask` represents the N last bits of `bestToken`. We
-        // group all filters indexed with a token sharing the same N bits.
-        suffixes[bestToken & mask].push([bestToken, filterIndex]);
       }
+
+      // `bestToken & mask` represents the N last bits of `bestToken`. We
+      // group all filters indexed with a token sharing the same N bits.
+      suffixes[bestToken & mask].push([bestToken, filterIndex]);
     }
 
     // Populate "tokens index" and "buckets index" based on best token found for each filter.
@@ -486,9 +426,9 @@ export class Index<T extends Indexable> {
     for (let i = 0; i < tokensLookupIndexSize; i += 1) {
       const filtersForMask = suffixes[i];
       tokensLookupIndex[i] = indexInBucketsIndex;
-      for (let j = 0; j < filtersForMask.length; j += 1) {
-        bucketsIndex[indexInBucketsIndex++] = filtersForMask[j][0];
-        bucketsIndex[indexInBucketsIndex++] = filtersForMask[j][1];
+      for (const [token, index] of filtersForMask) {
+        bucketsIndex[indexInBucketsIndex++] = token;
+        bucketsIndex[indexInBucketsIndex++] = index;
       }
     }
 
@@ -529,7 +469,11 @@ export class Index<T extends Indexable> {
    * found inside. An early termination mechanism is built-in, to stop iterating
    * as soon as `false` is returned from the callback.
    */
-  private iterBucket(token: number, requestId: number, cb: (f: T) => boolean): boolean {
+  private iterBucket(
+    token: number,
+    requestId: number,
+    cb: (value: T) => boolean,
+  ): boolean {
     let bucket: Bucket<T> | undefined = this.cache.get(token);
 
     // Lazily create bucket if it does not yet exist in memory. Lookup the
@@ -571,8 +515,8 @@ export class Index<T extends Indexable> {
       // create a `Bucket` instance to hold them for future access.
       const filters: T[] = [];
       const view = this.view;
-      for (let i = 0; i < filtersIndices.length; i += 1) {
-        view.setPos(filtersIndices[i]);
+      for (const filterIndex of filtersIndices) {
+        view.setPos(filterIndex);
         filters.push(this.deserializeFilter(view));
       }
 
@@ -590,19 +534,9 @@ export class Index<T extends Indexable> {
     if (bucket.lastRequestSeen !== requestId) {
       bucket.lastRequestSeen = requestId;
       const filters = bucket.filters;
-      for (let i = 0; i < filters.length; i += 1) {
+      for (const filter of filters) {
         // Break the loop if the callback returns `false`
-        if (cb(filters[i]) === false) {
-          // Whenever we get a match from a filter, we also swap it one
-          // position up in the list. This way, over time, popular filters will
-          // be first and might match earlier. This should decrease the time
-          // needed to get a match.
-          if (i > 0) {
-            const filter = filters[i];
-            filters[i] = filters[i - 1];
-            filters[i - 1] = filter;
-          }
-
+        if (cb(filter) === false) {
           return false;
         }
       }

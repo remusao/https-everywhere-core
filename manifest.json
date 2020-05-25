@@ -5,9 +5,14 @@
   "version": "1.0.0",
   "homepage_url": "https://github.com/remusao/https",
   "author": "remusao",
+  "icons": {
+    "128": "./icon-on.png"
+  },
   "permissions": [
     "webRequest",
     "webRequestBlocking",
+    "webNavigation",
+    "tabs",
     "<all_urls>",
     "storage",
     "unlimitedStorage",

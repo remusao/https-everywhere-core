@@ -1,12 +1,12 @@
 import { Compression } from './compression';
 import crc32 from './crc32';
-// import { decode, encode } from './punycode';
 
 export const EMPTY_UINT8_ARRAY = new Uint8Array(0);
 export const EMPTY_UINT32_ARRAY = new Uint32Array(0);
 
 // Check if current architecture is little endian
-const LITTLE_ENDIAN: boolean = new Int8Array(new Int16Array([1]).buffer)[0] === 1;
+const LITTLE_ENDIAN: boolean =
+  new Int8Array(new Int16Array([1]).buffer)[0] === 1;
 
 function align4(pos: number): number {
   // From: https://stackoverflow.com/a/2022194
@@ -65,14 +65,6 @@ export function sizeOfASCII(str: string): number {
 }
 
 /**
- * Return number of bytes needed to serialize `str` UTF8 string.
- */
-// export function sizeOfUTF8(str: string): number {
-//   const encodedLength = encode(str).length;
-//   return encodedLength + sizeOfLength(encodedLength);
-// }
-
-/**
  * Return number of bytes needed to serialize `array`.
  */
 export function sizeOfUint32Array(array: Uint32Array): number {
@@ -85,6 +77,10 @@ export function sizeOfStrings(strings: readonly string[]): number {
     size += sizeOfASCII(str);
   }
   return size;
+}
+
+export function sizeOfRuleSetID(): number {
+  return 2 * sizeOfByte();
 }
 
 export function sizeOfTarget(str: string, compression: Compression): number {
@@ -108,7 +104,10 @@ export function sizeOfExclusion(str: string, compression: Compression): number {
   );
 }
 
-export function sizeOfSecurecookie(str: string, compression: Compression): number {
+export function sizeOfSecurecookie(
+  str: string,
+  compression: Compression,
+): number {
   return sizeOfBytesWithLength(
     compression.securecookies.getCompressedSize(str),
     false, // align
@@ -141,15 +140,21 @@ export class StaticDataView {
   /**
    * Instantiate a StaticDataView instance from `array` of type Uint8Array.
    */
-  public static fromUint8Array(array: Uint8Array, compression: Compression): StaticDataView {
+  public static fromUint8Array(
+    array: Uint8Array,
+    compression: Compression,
+  ): StaticDataView {
     return new StaticDataView(array, compression);
   }
 
   /**
    * Instantiate a StaticDataView with given `capacity` number of bytes.
    */
-  public static allocate(capacity: number, compression: Compression): StaticDataView {
-    return new StaticDataView(new Uint8Array(capacity), compression,);
+  public static allocate(
+    capacity: number,
+    compression: Compression,
+  ): StaticDataView {
+    return new StaticDataView(new Uint8Array(capacity), compression);
   }
 
   public pos: number;
@@ -161,7 +166,9 @@ export class StaticDataView {
       // This check makes sure that we will not load the adblocker on a
       // big-endian system. This would not work since byte ordering is important
       // at the moment (mainly for performance reasons).
-      throw new Error('Adblocker currently does not support Big-endian systems');
+      throw new Error(
+        'Adblocker currently does not support Big-endian systems',
+      );
     }
 
     this.compression = compression;
@@ -317,45 +324,6 @@ export class StaticDataView {
     );
   }
 
-  public pushUint32Array(arr: Uint32Array): void {
-    this.pushLength(arr.length);
-    // TODO - use `set` to push the full buffer at once?
-    for (let i = 0; i < arr.length; i += 1) {
-      this.pushUint32(arr[i]);
-    }
-  }
-
-  public getUint32Array(): Uint32Array {
-    const length = this.getLength();
-    const arr = new Uint32Array(length);
-    // TODO - use `subarray`?
-    for (let i = 0; i < length; i += 1) {
-      arr[i] = this.getUint32();
-    }
-    return arr;
-  }
-
-  // public pushUTF8(raw: string): void {
-  //   const str = encode(raw);
-  //   this.pushLength(str.length);
-
-  //   for (let i = 0; i < str.length; i += 1) {
-  //     this.buffer[this.pos++] = str.charCodeAt(i);
-  //   }
-  // }
-
-  // public getUTF8(): string {
-  //   const byteLength = this.getLength();
-  //   this.pos += byteLength;
-  //   return decode(
-  //     String.fromCharCode.apply(
-  //       null,
-  //       // @ts-ignore
-  //       this.buffer.subarray(this.pos - byteLength, this.pos),
-  //     ),
-  //   );
-  // }
-
   public pushASCII(str: string): void {
     this.pushLength(str.length);
 
@@ -368,8 +336,11 @@ export class StaticDataView {
     const byteLength = this.getLength();
     this.pos += byteLength;
 
-    // @ts-ignore
-    return String.fromCharCode.apply(null, this.buffer.subarray(this.pos - byteLength, this.pos));
+    return String.fromCharCode.apply(
+      null,
+      // @ts-ignore
+      this.buffer.subarray(this.pos - byteLength, this.pos),
+    );
   }
 
   public pushStrings(strings: readonly string[]): void {
@@ -386,6 +357,14 @@ export class StaticDataView {
       strings.push(this.getASCII());
     }
     return strings;
+  }
+
+  public pushRuleSetID(id: number): void {
+    this.pushUint16(id);
+  }
+
+  public getRuleSetID(): number {
+    return this.getUint16();
   }
 
   public pushTarget(str: string): void {
@@ -438,7 +417,7 @@ export class StaticDataView {
     }
   }
 
-  private getLength(): number {
+  public getLength(): number {
     const lengthShort = this.getUint8();
     return lengthShort === 128 ? this.getUint32() : lengthShort;
   }

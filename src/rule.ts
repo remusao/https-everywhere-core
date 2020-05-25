@@ -1,55 +1,63 @@
-import { StaticDataView, sizeOfRule, sizeOfByte } from "./data-view";
-import { Compression } from "./compression";
-import { Indexable } from "./reverse-index";
+import { StaticDataView, sizeOfRule, sizeOfRuleSetID } from './data-view';
+import { Compression } from './compression';
+import { Indexable } from './reverse-index';
 
-export class Rule implements Indexable {
-  static deserialize(buffer: StaticDataView): Rule {
-    return new Rule(buffer.getRule(), buffer.getRule(), buffer.getUint32());
+export interface RuleObj {
+  from: string;
+  to: string;
+}
+
+export class Rule implements Indexable, RuleObj {
+  static fromObj({ from, to }: RuleObj, ruleset: number): Rule {
+    return new Rule(from, to, ruleset);
   }
 
-  private lazyFromRe: RegExp | undefined;
+  static deserialize(buffer: StaticDataView): Rule {
+    return new Rule(buffer.getRule(), buffer.getRule(), buffer.getRuleSetID());
+  }
+
+  private lazyFromRe: RegExp | undefined = undefined;
 
   constructor(
     public readonly from: string,
     public readonly to: string,
-    public readonly ruleset: number
-  ) {
-    this.lazyFromRe = undefined;
+    public readonly ruleset: number,
+  ) {}
+
+  toString(): string {
+    return `Rule(${this.from}, ${this.to}, ${this.ruleset})`;
   }
 
   serialize(buffer: StaticDataView): void {
     buffer.pushRule(this.from);
     buffer.pushRule(this.to);
-    buffer.pushUint32(this.ruleset);
+    buffer.pushRuleSetID(this.ruleset);
   }
 
   getSerializedSize(compression: Compression): number {
     return (
       sizeOfRule(this.from, compression) +
       sizeOfRule(this.to, compression) +
-      4 * sizeOfByte()
+      sizeOfRuleSetID()
     );
   }
 
-  getId(): number {
-    let hash = (7907 * 33) ^ this.ruleset;
-
-    for (let i = 0; i < this.from.length; i += 1) {
-      hash = (hash * 33) ^ this.from.charCodeAt(i);
-    }
-
-    for (let i = 0; i < this.to.length; i += 1) {
-      hash = (hash * 33) ^ this.to.charCodeAt(i);
-    }
-
-    return hash >>> 0;
-  }
-
   getTokens(): Uint32Array {
+    // TODO - tokenize 'from' as well here.
     return new Uint32Array([this.ruleset]);
   }
 
   rewrite(url: string): string | null {
+    // Special case.
+    if (this.from === '^http:' && this.to === 'https:') {
+      if (url.startsWith('http:')) {
+        return `https:${url.slice(5)}`;
+      }
+
+      return null;
+    }
+
+    // Fallback to RegExp.
     if (this.lazyFromRe === undefined) {
       this.lazyFromRe = new RegExp(this.from);
     }

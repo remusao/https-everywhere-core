@@ -21,7 +21,11 @@ const T: Int32Array = (() => {
   return table;
 })();
 
-export default function crc32(buf: Uint8Array, start: number, end: number): number {
+export default function crc32(
+  buf: Uint8Array,
+  start: number,
+  end: number,
+): number {
   let C: number = 0 ^ -1;
   const L: number = end - 7;
   let i: number = start;

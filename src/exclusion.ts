@@ -1,43 +1,46 @@
-import { StaticDataView, sizeOfExclusion, sizeOfByte } from "./data-view";
-import { Compression } from "./compression";
-import { tokenizeRegexInPlace } from "./utils";
-import { TOKENS_BUFFER } from "./tokens-buffer";
-import { Indexable } from "./reverse-index";
+import { StaticDataView, sizeOfExclusion, sizeOfRuleSetID } from './data-view';
+import { Compression } from './compression';
+import { tokenizeRegexInPlace } from './utils';
+import { TOKENS_BUFFER } from './tokens-buffer';
+import { Indexable } from './reverse-index';
 
-export class Exclusion implements Indexable {
+export interface ExclusionObj {
+  pattern: string;
+}
+
+export class Exclusion implements Indexable, ExclusionObj {
+  static fromObj({ pattern }: ExclusionObj, ruleset: number): Exclusion {
+    return new Exclusion(pattern, ruleset);
+  }
+
   static deserialize(buffer: StaticDataView): Exclusion {
-    return new Exclusion(buffer.getExclusion(), buffer.getUint32());
+    return new Exclusion(buffer.getExclusion(), buffer.getRuleSetID());
   }
 
   private lazyPatternRe: RegExp | undefined;
 
   constructor(
     public readonly pattern: string,
-    public readonly ruleset: number
+    public readonly ruleset: number,
   ) {
     this.lazyPatternRe = undefined;
   }
 
-  getId(): number {
-    let hash = (7907 * 33) ^ this.ruleset;
-
-    for (let i = 0; i < this.pattern.length; i += 1) {
-      hash = (hash * 33) ^ this.pattern.charCodeAt(i);
-    }
-
-    return hash >>> 0;
+  toString(): string {
+    return `Exclusion(${this.pattern}, ${this.ruleset})`;
   }
 
   serialize(buffer: StaticDataView): void {
     buffer.pushExclusion(this.pattern);
-    buffer.pushUint32(this.ruleset);
+    buffer.pushRuleSetID(this.ruleset);
   }
 
   getSerializedSize(compression: Compression): number {
-    return sizeOfExclusion(this.pattern, compression) + 4 * sizeOfByte();
+    return sizeOfExclusion(this.pattern, compression) + sizeOfRuleSetID();
   }
 
   getTokens(): Uint32Array {
+    // TODO - add ruleset ID in tokens
     TOKENS_BUFFER.reset();
     tokenizeRegexInPlace(this.pattern, TOKENS_BUFFER);
     return TOKENS_BUFFER.slice();

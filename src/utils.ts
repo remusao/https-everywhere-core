@@ -1,89 +1,15 @@
 import { TokensBuffer, TOKENS_BUFFER } from './tokens-buffer';
 
-export const HASH_SEED = 7877;
+export const HASH_SEED = 1453;
 
-/***************************************************************************
- *  Bitwise helpers
- * ************************************************************************* */
-
-// From: https://stackoverflow.com/a/43122214/1185079
-export function bitCount(n: number): number {
-  n = n - ((n >> 1) & 0x55555555);
-  n = (n & 0x33333333) + ((n >> 2) & 0x33333333);
-  return (((n + (n >> 4)) & 0xf0f0f0f) * 0x1010101) >> 24;
-}
-
-export function getBit(n: number, mask: number): boolean {
-  return !!(n & mask);
-}
-
-export function setBit(n: number, mask: number): number {
-  return n | mask;
-}
-
-export function clearBit(n: number, mask: number): number {
-  return n & ~mask;
-}
-
-export function fastHashBetween(str: string, begin: number, end: number): number {
+export function fastHash(str: string): number {
   let hash = HASH_SEED;
 
-  for (let i = begin; i < end; i += 1) {
+  for (let i = 0; i < str.length; i += 1) {
     hash = (hash * 33) ^ str.charCodeAt(i);
   }
 
   return hash >>> 0;
-}
-
-export function fastHash(str: string): number {
-  if (typeof str !== 'string') {
-    return 0;
-  }
-
-  if (str.length === 0) {
-    return 0;
-  }
-
-  return fastHashBetween(str, 0, str.length);
-}
-
-export function hashStrings(strings: string[]): Uint32Array {
-  const result = new Uint32Array(strings.length);
-  for (let i = 0; i < strings.length; i += 1) {
-    result[i] = fastHash(strings[i]);
-  }
-  return result;
-}
-
-// https://jsperf.com/string-startswith/21
-export function fastStartsWith(haystack: string, needle: string): boolean {
-  if (haystack.length < needle.length) {
-    return false;
-  }
-
-  const ceil = needle.length;
-  for (let i = 0; i < ceil; i += 1) {
-    if (haystack[i] !== needle[i]) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-export function fastStartsWithFrom(haystack: string, needle: string, start: number): boolean {
-  if (haystack.length - start < needle.length) {
-    return false;
-  }
-
-  const ceil = start + needle.length;
-  for (let i = start; i < ceil; i += 1) {
-    if (haystack[i] !== needle[i - start]) {
-      return false;
-    }
-  }
-
-  return true;
 }
 
 export function isDigit(ch: number): boolean {
@@ -130,58 +56,12 @@ function isCyrillic(ch: number): boolean {
 
 function isAllowedCode(ch: number): boolean {
   return (
-    isAlpha(ch) || isDigit(ch) || ch === 37 /* '%' */ || isAlphaExtended(ch) || isCyrillic(ch)
+    isAlpha(ch) ||
+    isDigit(ch) ||
+    ch === 37 /* '%' */ ||
+    isAlphaExtended(ch) ||
+    isCyrillic(ch)
   );
-}
-
-export function tokenizeWithWildcardsInPlace(
-  pattern: string,
-  skipFirstToken: boolean,
-  skipLastToken: boolean,
-  buffer: TokensBuffer,
-): void {
-  const len = Math.min(pattern.length, buffer.remaining() * 2);
-  let inside = false;
-  let precedingCh = 0;
-  let start = 0;
-  let hash = HASH_SEED;
-
-  for (let i = 0; i < len; i += 1) {
-    const ch = pattern.charCodeAt(i);
-    if (isAllowedCode(ch) === true) {
-      if (inside === false) {
-        hash = HASH_SEED;
-        inside = true;
-        start = i;
-      }
-      hash = (hash * 33) ^ ch;
-    } else {
-      if (inside === true) {
-        inside = false;
-
-        if (
-          i - start > 1 && // Ignore tokens of 1 character
-          ch !== 42 && // Ignore tokens followed by a '*'
-          precedingCh !== 42 && // Ignore tokens preceeded by a '*'
-          (skipFirstToken === false || start !== 0)
-        ) {
-          buffer.push(hash >>> 0);
-        }
-      }
-
-      precedingCh = ch;
-    }
-  }
-
-  if (
-    skipLastToken === false &&
-    inside === true &&
-    precedingCh !== 42 && // Ignore tokens preceeded by a '*'
-    pattern.length - start > 1 && // Ignore tokens of 1 character
-    TOKENS_BUFFER.full() === false
-  ) {
-    buffer.push(hash >>> 0);
-  }
 }
 
 export function tokenizeInPlace(
@@ -225,47 +105,36 @@ export function tokenizeInPlace(
   }
 }
 
-export function tokenizeNoSkipInPlace(pattern: string, buffer: TokensBuffer): void {
-  const len = Math.min(pattern.length, buffer.remaining() * 2);
-  let inside = false;
-  let start = 0;
+export function tokenizeHostnameInPlace(
+  pattern: string,
+  buffer: TokensBuffer,
+): void {
+  let ignore = false;
   let hash = HASH_SEED;
 
-  for (let i = 0; i < len; i += 1) {
+  for (let i = 0; i < pattern.length; i += 1) {
     const ch = pattern.charCodeAt(i);
-    if (isAllowedCode(ch) === true) {
-      if (inside === false) {
-        hash = HASH_SEED;
-        inside = true;
-        start = i;
-      }
-      hash = (hash * 33) ^ ch;
-    } else if (inside === true) {
-      inside = false;
-      if (i - start > 1) {
+    if (ch === 42 /* '*' */) {
+      ignore = true;
+    } else if (ch === 46 /* '.' */) {
+      if (ignore === false) {
         buffer.push(hash >>> 0);
       }
+      hash = HASH_SEED;
+      ignore = false;
+    } else if (ignore === false) {
+      hash = (hash * 33) ^ ch;
     }
   }
 
-  if (inside === true && pattern.length - start > 1 && TOKENS_BUFFER.full() === false) {
+  if (ignore === false && hash !== HASH_SEED) {
     buffer.push(hash >>> 0);
   }
 }
 
-export function tokenizeNoSkip(pattern: string): Uint32Array {
+export function tokenizeHostname(pattern: string): Uint32Array {
   TOKENS_BUFFER.reset();
-  tokenizeNoSkipInPlace(pattern, TOKENS_BUFFER);
-  return TOKENS_BUFFER.slice();
-}
-
-export function tokenizeWithWildcards(
-  pattern: string,
-  skipFirstToken: boolean,
-  skipLastToken: boolean,
-): Uint32Array {
-  TOKENS_BUFFER.reset();
-  tokenizeWithWildcardsInPlace(pattern, skipFirstToken, skipLastToken, TOKENS_BUFFER);
+  tokenizeHostnameInPlace(pattern, TOKENS_BUFFER);
   return TOKENS_BUFFER.slice();
 }
 
@@ -279,7 +148,10 @@ export function tokenize(
   return TOKENS_BUFFER.slice();
 }
 
-export function tokenizeRegexInPlace(selector: string, tokens: TokensBuffer): void {
+export function tokenizeRegexInPlace(
+  selector: string,
+  tokens: TokensBuffer,
+): void {
   let end = selector.length;
   let begin = 0;
   let prev: number = 0;
@@ -302,7 +174,7 @@ export function tokenizeRegexInPlace(selector: string, tokens: TokensBuffer): vo
       code === 63 /* '?' */ ||
       code === 91 /* '[' */ ||
       code === 123 /* '{' */ ||
-      (code === 46 /* '.' */ && prev !== 92 /* '\' */) ||
+      (code === 46 /* '.' */ && prev !== 92) /* '\' */ ||
       (code === 92 /* '\' */ && isAlpha(selector.charCodeAt(begin + 1)))
     ) {
       break;
@@ -330,7 +202,8 @@ export function tokenizeRegexInPlace(selector: string, tokens: TokensBuffer): vo
       code === 63 /* '?' */ ||
       code === 93 /* ']' */ ||
       code === 125 /* '}' */ ||
-      (code === 46 /* '.' */ && selector.charCodeAt(end - 1) !== 92 /* '\' */) ||
+      (code === 46 /* '.' */ &&
+        selector.charCodeAt(end - 1) !== 92) /* '\' */ ||
       (code === 92 /* '\' */ && isAlpha(prev))
     ) {
       break;
@@ -342,32 +215,18 @@ export function tokenizeRegexInPlace(selector: string, tokens: TokensBuffer): vo
   if (end < begin) {
     // Full selector is safe
     const skipFirstToken: boolean = selector.charCodeAt(0) !== 94; /* '^' */
-    const skipLastToken: boolean = selector.charCodeAt(selector.length - 1) !== 36; /* '$' */
+    const skipLastToken: boolean =
+      selector.charCodeAt(selector.length - 1) !== 36; /* '$' */
     tokenizeInPlace(selector, skipFirstToken, skipLastToken, tokens);
   } else {
     // Tokenize prefix
     if (begin > 0) {
-      tokenizeInPlace(
-        selector.slice(0, begin),
-        true,
-        true,
-        tokens,
-      );
+      tokenizeInPlace(selector.slice(0, begin), true, true, tokens);
     }
 
     // Tokenize suffix
     if (end < selector.length) {
-      tokenizeInPlace(
-        selector.slice(end + 1),
-        true,
-        true,
-        tokens,
-      );
+      tokenizeInPlace(selector.slice(end + 1), true, true, tokens);
     }
   }
-}
-
-const hasUnicodeRe = /[^\u0000-\u00ff]/;
-export function hasUnicode(str: string): boolean {
-  return hasUnicodeRe.test(str);
 }

@@ -24,10 +24,6 @@ export class TokensBuffer {
     this.buffer[this.pos++] = token;
   }
 
-  public empty(): boolean {
-    return this.pos === 0;
-  }
-
   public full(): boolean {
     return this.pos === this.buffer.length;
   }

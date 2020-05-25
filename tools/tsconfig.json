@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig",
+  "compilerOptions": {
+    "noEmit": true,
+    "module": "commonjs",
+    "composite": true
+  },
+  "files": [
+    "./generate-binary-engine.ts",
+    "./generate_compression_codebooks.ts",
+    "./xml-to-json-rules.ts"
+  ]
+}

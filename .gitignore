@@ -1,5 +1,4 @@
 node_modules
-engine.bin
 .nyc_output
 background.bundle.js
 background.bundle.js.map

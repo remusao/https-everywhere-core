@@ -1,6 +1,12 @@
-import { Smaz } from "@remusao/smaz";
+import { Smaz } from '@remusao/smaz';
 
-import { StaticDataView, sizeOfStrings } from "./data-view";
+import { StaticDataView, sizeOfStrings } from './data-view';
+
+import codebookTargets from './codebooks/targets';
+import codebookRules from './codebooks/rules';
+import codebookExclusions from './codebooks/exclusions';
+import codebookSecurecookies from './codebooks/securecookies';
+
 
 export interface Codebooks {
   rules: string[];
@@ -10,6 +16,24 @@ export interface Codebooks {
 }
 
 export class Compression {
+  static noop(): Compression {
+    return new Compression({
+      exclusions: [],
+      targets: [],
+      rules: [],
+      securecookies: [],
+    });
+  }
+
+  static default(): Compression {
+    return new Compression({
+      exclusions: codebookExclusions,
+      targets: codebookTargets,
+      rules: codebookRules,
+      securecookies: codebookSecurecookies,
+    });
+  }
+
   static deserialize(buffer: StaticDataView): Compression {
     return new Compression({
       exclusions: buffer.getStrings(),

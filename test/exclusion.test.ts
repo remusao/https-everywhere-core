@@ -1,47 +1,75 @@
-import { expect } from "chai";
-import "mocha";
+import { expect } from 'chai';
+import 'mocha';
 
-import { fastHash } from "../src/utils";
-import { Exclusion } from "../src/exclusion";
+import { loadExclusions } from './utils';
 
-function t(tokens: string[]): Uint32Array {
-  return new Uint32Array(tokens.map(fastHash));
-}
+import { fastHash } from '../src/utils';
+import { Compression } from '../src/compression';
+import { StaticDataView } from '../src/data-view';
+import { Exclusion } from '../src/exclusion';
 
-describe("#Exclusion", () => {
-  describe("#getTokens", () => {
-    it("empty pattern", () => {
-      expect(new Exclusion("", 0).getTokens()).to.be.empty;
-    });
+describe('#Exclusion', () => {
+  const exclusions = loadExclusions();
 
-    it("plain pattern", () => {
-      expect(new Exclusion("^foo$", 0).getTokens()).to.eql(t(["foo"]));
-    });
+  it('#toString', () => {
+    expect(new Exclusion('pattern', 42).toString()).to.equal(
+      'Exclusion(pattern, 42)',
+    );
+  });
 
-    it("url", () => {
-      expect(new Exclusion("^http://foo\\.com/$", 0).getTokens()).to.eql(
-        t(["http", "foo", "com"])
-      );
-    });
-
-    for (const [pattern, tokens] of [
-      ['&amp;Signature=', ['amp', 'Signature']],
-      ['\\.crl$', ['crl']],
-      ['\\.crl', []],
-      ['\\.js(?:$|\\?)', []],
-      ['^(?!http://((?:[a-z][a-z]|discussions|origin|photos|www)\\.)?flightaware\\.com/)', []],
-      ['^http://((?:[^./]+\\.){2,}|(?:[^./]+\\.){3,})b(?:ooking|static)\\.com/', ['http', 'com']],
-      ['^http://((ci|www)\\.)?openccc\\.net/$', ['http', 'net']], // TODO openccc?
-      ['^http://((ssl|www)\\.)?instructables\\.com/(contest|id)/', ['http']],
-      ['^http://((ssl|www)\\.)?instructables\\.com/(intl_static|json-api)/', ['http']],
-      ['^http://(?!(?:dbg\\d+|v\\d+|www)\\.moatads\\.com/)', ['http']],
-      ['^http://(?![^.]+\\.science\\.nature\\.nps\\.gov/)(?:[^.]+\\.){2,}nature\\.nps\\.gov/', ['http', 'nps', 'gov']],
-      ['^http://(?!assets1\\.fastly\\.com\\.a\\.prod\\.)[\\w.-]+\\.prod\\.fastly\\.net/', ['http', 'prod', 'fastly', 'net']],
-      ['ocsp\\.startssl', []],
-    ] as [string, string[]][]) {
-      it(`${pattern}`, () => {
-        expect(new Exclusion(pattern, 0).getTokens()).to.eql(t(tokens));
-      });
+  it('#fromObj', () => {
+    for (const exclusion of exclusions) {
+      expect(
+        Exclusion.fromObj({ pattern: exclusion.pattern }, exclusion.ruleset),
+      ).to.eql(exclusion);
     }
+  });
+
+  it('#serialize/#deserialize/#getSerializedSize', () => {
+    const compression = Compression.default();
+    const buffer = StaticDataView.allocate(10000, compression);
+    for (const exclusion of exclusions) {
+      buffer.seekZero();
+      exclusion.serialize(buffer);
+
+      expect(
+        exclusion.getSerializedSize(compression),
+        `estimated size of ${exclusion} should be ${buffer.pos}`,
+      ).to.equal(buffer.pos);
+
+      buffer.seekZero();
+      expect(
+        Exclusion.deserialize(buffer),
+        `deserializing ${exclusion}`,
+      ).to.eql(exclusion);
+    }
+  });
+
+  it('#getTokens', () => {
+    for (const [pattern, tokens] of [
+      ['', []],
+      ['foo', []],
+      ['foo$', []],
+      ['^foo', []],
+      ['^foo$', ['foo']],
+      ['^foo/bar$', ['foo', 'bar']],
+      ['^http://foo/bar$', ['http', 'foo', 'bar']],
+      ['^http://foo/bar|baz$', []],
+      ['^http://foo/bar|baz$', []],
+      ['^http|https://(?:foo)/bar$', []],
+    ] as [string, string[]][]) {
+      expect(new Exclusion(pattern, 42).getTokens(), pattern).to.eql(
+        new Uint32Array(tokens.map(fastHash)),
+      );
+    }
+  });
+
+  describe('#match', () => {
+    it('simple regex', () => {
+      const exclusion = new Exclusion('^http:', 42);
+      for (let i = 0; i < 2; i += 1) {
+        expect(exclusion.match('http://foo.com')).to.be.true;
+      }
+    });
   });
 });

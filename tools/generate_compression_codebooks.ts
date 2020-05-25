@@ -1,57 +1,67 @@
-import { readFileSync, writeFileSync } from "fs";
-import { resolve, join } from "path";
-import { generate } from "@remusao/smaz-generate";
-import { Smaz } from "@remusao/smaz";
+import { readFileSync, writeFileSync } from 'fs';
+import { resolve, join } from 'path';
+import { generate } from '@remusao/smaz-generate';
+import { Smaz } from '@remusao/smaz';
 
-import { RuleSets } from "../src/rulesets";
-import { Target } from "../src/target";
-import { Rule } from "../src/rule";
-import { SecureCookie } from "../src/secure-cookie";
-import { Exclusion } from "../src/exclusion";
+import { RuleSetObj } from '../src/ruleset';
 
-function loadRuleSets(): RuleSets {
-  return RuleSets.deserialize(
-    new Uint8Array(readFileSync(resolve(join(__dirname, "..", "engine.bin"))))
+function loadRuleSets(): RuleSetObj[] {
+  return JSON.parse(
+    readFileSync(resolve(join(__dirname, '..', 'rulesets.json')), 'utf-8'),
   );
 }
 
-function getTargets(): Target[] {
-  return loadRuleSets().targets.getFilters();
+function getTargets(): string[] {
+  const strings: string[] = [];
+  for (const { targets } of loadRuleSets()) {
+    for (const { host } of targets) {
+      strings.push(host);
+    }
+  }
+  return strings;
 }
 
-function getRules(): Rule[] {
-  return loadRuleSets().rules.getFilters();
+function getRules(): string[] {
+  const strings: string[] = [];
+  for (const { rules } of loadRuleSets()) {
+    for (const { from, to } of rules) {
+      strings.push(from, to);
+    }
+  }
+  return strings;
 }
 
-function getExclusions(): Exclusion[] {
-  return loadRuleSets().exclusions.getFilters();
+function getExclusions(): string[] {
+  const strings: string[] = [];
+  for (const { exclusions } of loadRuleSets()) {
+    for (const { pattern } of exclusions) {
+      strings.push(pattern);
+    }
+  }
+  return strings;
 }
 
-function getSecureCookies(): SecureCookie[] {
-  return loadRuleSets().securecookies.getFilters();
+function getSecureCookies(): string[] {
+  const strings: string[] = [];
+  for (const { securecookies } of loadRuleSets()) {
+    for (const { host, name } of securecookies) {
+      strings.push(host, name);
+    }
+  }
+  return strings;
 }
 
 function getStrings(kind: string): string[] {
   switch (kind) {
-    case "targets":
-      return getTargets().map((target) => target.host);
-    case "exclusions":
-      return getExclusions().map((exclusion) => exclusion.pattern);
-    case "securecookies": {
-      const strings: string[] = [];
-      for (const securecookie of getSecureCookies()) {
-        strings.push(securecookie.host);
-        strings.push(securecookie.name);
-      }
-      return strings;
+    case 'targets':
+      return getTargets();
+    case 'exclusions':
+      return getExclusions();
+    case 'securecookies': {
+      return getSecureCookies();
     }
-    case "rules": {
-      const strings: string[] = [];
-      for (const rule of getRules()) {
-        strings.push(rule.from);
-        strings.push(rule.to);
-      }
-      return strings;
+    case 'rules': {
+      return getRules();
     }
     default:
       throw new Error(`Unsupported codebook: ${kind}`);
@@ -59,7 +69,7 @@ function getStrings(kind: string): string[] {
 }
 
 function validateCodebook(codebook: string[], strings: string[]): void {
-  console.log("Validating codebook", codebook);
+  console.log('Validating codebook', codebook);
   console.log(`Checking ${strings.length} strings...`);
 
   const smaz = new Smaz(codebook);
@@ -73,7 +83,7 @@ function validateCodebook(codebook: string[], strings: string[]): void {
     const original = smaz.decompress(compressed);
     if (original !== str) {
       throw new Error(
-        `Mismatch: ${str} vs. ${original} (compressed: ${compressed})`
+        `Mismatch: ${str} vs. ${original} (compressed: ${compressed})`,
       );
     }
 
@@ -83,7 +93,7 @@ function validateCodebook(codebook: string[], strings: string[]): void {
     minSize = Math.min(minSize, str.length);
   }
 
-  console.log("Codebook validated:", {
+  console.log('Codebook validated:', {
     maxSize,
     minSize,
     totalSize,
@@ -106,7 +116,7 @@ function generateCodebook(kind: string): string[] {
   const kind = process.argv[process.argv.length - 1];
   const codebook = generateCodebook(kind);
   const output = resolve(__dirname, `../src/codebooks/${kind}.ts`);
-  console.log("Updating", output);
+  console.log('Updating', output);
   writeFileSync(
     output,
     [
@@ -119,9 +129,9 @@ function generateCodebook(kind: string): string[] {
           return str1.localeCompare(str2);
         }),
         null,
-        2
+        2,
       )};`,
-    ].join("\n"),
-    "utf-8"
+    ].join('\n'),
+    'utf-8',
   );
 })();

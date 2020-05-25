@@ -1,16 +1,68 @@
-import { Target } from './target';
-import { Rule } from './rule';
-import { Exclusion } from './exclusion';
-import { SecureCookie } from './secure-cookie';
+import { Target, TargetObj } from './target';
+import { Rule, RuleObj } from './rule';
+import { Exclusion, ExclusionObj } from './exclusion';
+import { SecureCookie, SecureCookieObj } from './secure-cookie';
+import { Test, TestObj } from './test';
 
-export class RuleSetMeta {
+export interface RuleSetObj {
+  name: string;
+  defaultState: boolean;
+  scope: any;
+  note: string;
+  exclusions: ExclusionObj[];
+  rules: RuleObj[];
+  securecookies: SecureCookieObj[];
+  targets: TargetObj[];
+  tests: TestObj[];
+}
+
+export class RuleSet implements RuleSetObj {
+  static fromObj(
+    {
+      name,
+      defaultState,
+      scope,
+      note,
+      exclusions,
+      rules,
+      securecookies,
+      targets,
+      tests,
+    }: RuleSetObj,
+    id: number,
+  ): RuleSet {
+    const ruleset = new RuleSet(name, id, defaultState, scope, note);
+
+    ruleset.targets.push(
+      ...targets.map((target) => Target.fromObj(target, id)),
+    );
+    ruleset.exclusions.push(
+      ...exclusions.map((exclusion) => Exclusion.fromObj(exclusion, id)),
+    );
+    ruleset.rules.push(...rules.map((rule) => Rule.fromObj(rule, id)));
+    ruleset.securecookies.push(
+      ...securecookies.map((securecookie) =>
+        SecureCookie.fromObj(securecookie, id),
+      ),
+    );
+    ruleset.tests.push(...tests.map((test) => Test.fromObj(test, id)));
+
+    return ruleset;
+  }
+
+  public exclusions: Exclusion[] = [];
+  public rules: Rule[] = [];
+  public securecookies: SecureCookie[] = [];
+  public targets: Target[] = [];
+  public tests: Test[] = [];
   public active: boolean;
 
   constructor(
     public readonly name: string,
+    public readonly id: number,
     public readonly defaultState: boolean = true,
     public readonly scope: any = '',
-    public readonly note: string = ''
+    public readonly note: string = '',
   ) {
     this.active = defaultState;
   }
@@ -24,13 +76,6 @@ export class RuleSetMeta {
 
     return hash >>> 0;
   }
-}
-
-export class RuleSet extends RuleSetMeta {
-  public exclusions: Exclusion[] = [];
-  public rules: Rule[] = [];
-  public securecookies: SecureCookie[] = [];
-  public targets: Target[] = [];
 
   // NOTE: Currently, the ID of a ruleset is only defined based on its 'name'
   // attribute. Ideally, we would probably want the ID to be a function of all
