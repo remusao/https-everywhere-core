@@ -19,7 +19,7 @@ function readRuleSetsObj(): RuleSetObj[] {
   const engine = RuleSets.fromRuleSets(
     rulesets.map((ruleset) => RuleSet.fromObj(ruleset, ruleSetId++)),
     new Config({
-      tradeMemoryForUncertainty: true,
+      tradeMemoryForUncertainty: false,
     }),
   );
   // let engine = RuleSets.fromRuleSets(rulesets);
