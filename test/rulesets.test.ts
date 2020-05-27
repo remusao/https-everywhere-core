@@ -44,13 +44,26 @@ describe('#RuleSets', () => {
     );
     for (const tradeMemoryForUncertainty of [false, true]) {
       it(`tradeMemoryForUncertainty=${tradeMemoryForUncertainty}`, () => {
-        const engine = RuleSets.fromRuleSets(rulesets, new Config({ tradeMemoryForUncertainty }));
+        const engine = RuleSets.fromRuleSets(
+          rulesets,
+          new Config({ tradeMemoryForUncertainty }),
+        );
         for (const testcase of cases) {
           const match = engine.match(testcase.url);
-          expect([...match.rulesets].sort(), testcase.url).to.eql(testcase.rulesets);
-          expect([...new Set(match.exclusions.map(e => e.toString()).sort())], testcase.url).to.eql(testcase.exclusions);
-          expect(match.rules.map(r => r.toString()).sort(), testcase.url).to.eql(testcase.rules);
-          expect(match.rewritten.sort(), testcase.url).to.eql(testcase.rewritten);
+          expect([...match.rulesets].sort(), testcase.url).to.eql(
+            testcase.rulesets,
+          );
+          expect(
+            [...new Set(match.exclusions.map((e) => e.toString()).sort())],
+            testcase.url,
+          ).to.eql(testcase.exclusions);
+          expect(
+            match.rules.map((r) => r.toString()).sort(),
+            testcase.url,
+          ).to.eql(testcase.rules);
+          expect(match.rewritten.sort(), testcase.url).to.eql(
+            testcase.rewritten,
+          );
         }
       });
     }

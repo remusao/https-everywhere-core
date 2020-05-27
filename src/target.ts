@@ -36,7 +36,6 @@ export class Target implements Indexable, TargetObj {
   }
 
   match(hostname: string): boolean {
-
     if (this.host === '*') {
       return hostname.includes('.') === false;
     }

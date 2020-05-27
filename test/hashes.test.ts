@@ -11,7 +11,9 @@ describe('#Hashes', () => {
   const targets = loadTargets();
 
   it('#serialize/#deserialize/#getSerializedSize', () => {
-    const hashes = new Hashes(targets.map(({ host, ruleset }) => [host, ruleset]));
+    const hashes = new Hashes(
+      targets.map(({ host, ruleset }) => [host, ruleset]),
+    );
     const buffer = StaticDataView.allocate(10000000, Compression.noop());
     hashes.serialize(buffer);
 
@@ -25,13 +27,17 @@ describe('#Hashes', () => {
   });
 
   it('#iter', () => {
-    const hashes = new Hashes([['foo.com', 1], ['bar.com', 2], ['baz.com', 1]]);
+    const hashes = new Hashes([
+      ['foo.com', 1],
+      ['bar.com', 2],
+      ['baz.com', 1],
+    ]);
     for (const [hostname, expected] of [
       ['foo.com', [1]],
       ['bar.com', [2]],
       ['baz.com', [1]],
       ['example.com', []],
-      ['foo', []]
+      ['foo', []],
     ] as [string, [number]][]) {
       const rulesets: number[] = [];
       hashes.iter(hostname, (ruleset) => {

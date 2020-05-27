@@ -84,10 +84,8 @@ describe('#Target', () => {
           hostname = `${hostname.slice(0, -2)}.com`;
         }
 
-        expect(
-          target.match(hostname),
-          `${target} to match ${hostname}`,
-        ).to.be.true;
+        expect(target.match(hostname), `${target} to match ${hostname}`).to.be
+          .true;
       }
     });
   });

@@ -12,14 +12,19 @@ describe('#SecureCookie', () => {
   const securecookies = loadSecureCookies();
 
   it('#toString', () => {
-    expect(new SecureCookie('host', 'name', 42).toString()).to.equal('SecureCookie(host, name, 42)');
+    expect(new SecureCookie('host', 'name', 42).toString()).to.equal(
+      'SecureCookie(host, name, 42)',
+    );
   });
 
   it('#fromObj', () => {
     for (const securecookie of securecookies) {
-      expect(SecureCookie.fromObj({ host: securecookie.host, name: securecookie.name }, securecookie.ruleset)).to.eql(
-        securecookie,
-      );
+      expect(
+        SecureCookie.fromObj(
+          { host: securecookie.host, name: securecookie.name },
+          securecookie.ruleset,
+        ),
+      ).to.eql(securecookie);
     }
   });
 
@@ -36,9 +41,10 @@ describe('#SecureCookie', () => {
       ).to.equal(buffer.pos);
 
       buffer.seekZero();
-      expect(SecureCookie.deserialize(buffer), `deserializing ${securecookie}`).to.eql(
-        securecookie,
-      );
+      expect(
+        SecureCookie.deserialize(buffer),
+        `deserializing ${securecookie}`,
+      ).to.eql(securecookie);
     }
   });
 
@@ -64,11 +70,11 @@ describe('#SecureCookie', () => {
       );
 
       // both
-      expect(new SecureCookie(pattern, pattern, 42).getTokens(), pattern).to.eql(
-        new Uint32Array([
-          ...tokens.map(fastHash),
-          ...tokens.map(fastHash),
-        ]),
+      expect(
+        new SecureCookie(pattern, pattern, 42).getTokens(),
+        pattern,
+      ).to.eql(
+        new Uint32Array([...tokens.map(fastHash), ...tokens.map(fastHash)]),
       );
     }
   });

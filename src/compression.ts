@@ -7,7 +7,6 @@ import codebookRules from './codebooks/rules';
 import codebookExclusions from './codebooks/exclusions';
 import codebookSecurecookies from './codebooks/securecookies';
 
-
 export interface Codebooks {
   rules: string[];
   targets: string[];
