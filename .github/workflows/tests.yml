@@ -1,0 +1,22 @@
+name: Tests
+
+on: [pull_request]
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: Use node 14.x
+        uses: actions/setup-node@v1
+        with:
+          node-version: '14.x'
+          registry-url: https://registry.npmjs.org
+
+      - name: Bootstrap
+        run: npm ci
+
+      - name: Test
+        run: npm test

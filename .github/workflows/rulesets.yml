@@ -1,0 +1,49 @@
+name: Assets
+
+on:
+  schedule:
+    - cron: '@hourly'
+
+jobs:
+  assets:
+    name: Update local assets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Checkout submodules
+        shell: bash
+        run: |
+          auth_header="$(git config --local --get http.https://github.com/.extraheader)"
+          git submodule sync --recursive
+          git -c "http.extraheader=$auth_header" -c protocol.version=2 submodule update --init --force --recursive
+
+      - name: Use node 14
+        uses: actions/setup-node@v1
+        with:
+          node-version: '14.x'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fetch latest assets
+        id: fetch
+        run: |
+          npm run xml-to-json-rules
+          npm run generate-codebooks
+          npm run generate-binary-engine
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Update HTTPS Everywhere rulesets"
+          title: "Update upstream HTTPS Everywhere rulesets"
+          body: "Automated update of upstream rulesets"
+          reviewers: remusao
+          branch: update-rulesets
+
+      - name: Check outputs
+        run: |
+          echo "Pull Request Number - ${{ env.PULL_REQUEST_NUMBER }}"
+          echo "Pull Request Number - ${{ steps.cpr.outputs.pr_number }}"
