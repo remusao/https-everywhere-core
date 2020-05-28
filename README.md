@@ -10,9 +10,8 @@ improve on current limitations of HTTPS Everywhere, such as:
 To this end, I started implementing a new engine with matching logic inspired by
 the techniques deployed in [@cliqz/adblocker](https://github.com/cliqz-oss/adblocker)
 over the years. Currently the performance is as follows:
-
 * Memory usage:
-    * `4.8MB` (4x less than HTTPS Everywhere in Rust/WebAsm).
+    * `4.7MB` (4x less than HTTPS Everywhere in Rust/WebAsm).
     * `2.1MB` using the probabilistic data-structure (9x less).
 * Loading rules from XML: `~1 second` (But `2.7 seconds` with JIT disabled).
 * Serialization of the engine: `1.5ms`.
