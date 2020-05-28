@@ -70,9 +70,7 @@ function* iter<T>(
 
   const rulesets: RuleSetObj[] = [];
 
-  // TODO - use local folder for rules? Maybe shallow clone?
-  const baseDir =
-    '/home/remi/dev/repositories/public/https-everywhere/src/chrome/content/rules/';
+  const baseDir = join(__dirname, '..', 'https-everywhere/src/chrome/content/rules/');
   for (const file of readdirSync(baseDir)) {
     if (file.endsWith('.xml')) {
       const {
