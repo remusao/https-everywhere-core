@@ -3,29 +3,50 @@ import { Badge } from '@remusao/badger';
 
 import { RuleSets } from './src/rulesets';
 
-(async () => {
-  const badge = new Badge({
-    badgeTextColor: 'white',
-    iconDisabled: './icon-off.png',
-    iconEnabled: './icon-on.png',
-  });
-
-  badge.enable();
-
-  // Load from cache (IndexedBD) or pre-built in extension (a serialized engine
-  // is shipped as part of the XPI and allows to initialize the extension very
-  // fast on cold start).
-  const engine = RuleSets.deserialize(
+async function init(): Promise<RuleSets> {
+  return RuleSets.deserialize(
     (await get('engine')) ||
       new Uint8Array(
         await (await fetch(chrome.runtime.getURL('engine.bin'))).arrayBuffer(),
       ),
   );
+}
+
+async function update(): Promise<RuleSets> {
+  console.time('Update engine');
+  console.time('Fetch update');
+  const serialized = await (
+    await fetch(
+      'https://raw.githubusercontent.com/remusao/https-everywhere-core/master/engine.bin',
+    )
+  ).arrayBuffer();
+  console.timeEnd('Fetch update');
+  console.time('Deserialize update');
+  console.timeEnd('Deserialize update');
+  await set('engine', serialized);
+  console.timeEnd('Update engine');
+  return RuleSets.deserialize(new Uint8Array(serialized));
+}
+
+(async () => {
+  console.time('Initialize badge');
+  const badge = new Badge({
+    badgeTextColor: 'white',
+    iconDisabled: './icon-off.png',
+    iconEnabled: './icon-on.png',
+  });
+  badge.enable();
+  console.timeEnd('Initialize badge');
+
+  // Load from cache (IndexedBD) or pre-built in extension (a serialized engine
+  // is shipped as part of the XPI and allows to initialize the extension very
+  // fast on cold start).
+  console.time('Initialize engine');
+  let engine = await init();
+  console.timeEnd('Initialize engine');
 
   setTimeout(async () => {
-    console.time('Persist serialized engine');
-    await set('engine', engine.serialize());
-    console.timeEnd('Persist serialized engine');
+    engine = await update();
   }, 5000);
 
   chrome.webRequest.onBeforeRequest.addListener(
