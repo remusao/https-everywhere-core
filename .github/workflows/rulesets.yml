@@ -37,7 +37,7 @@ jobs:
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.TOKEN_ASSETS }}
           commit-message: "Update HTTPS Everywhere rulesets"
           title: "Update upstream HTTPS Everywhere rulesets"
           body: "Automated update of upstream rulesets"
