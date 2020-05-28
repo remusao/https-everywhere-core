@@ -152,12 +152,21 @@ export class RuleSets {
     );
   }
 
-  toRuleSets(): { targets: string[]; exclusions: string[]; rules: string[]; securecookies: string[]; } {
+  toRuleSets(): {
+    targets: string[];
+    exclusions: string[];
+    rules: string[];
+    securecookies: string[];
+  } {
     return {
-      targets: [...this.targetsIndex.values()].map(t => t.toString()).sort(),
-      exclusions: [...this.exclusionsIndex.values()].map(e => e.toString()).sort(),
-      rules: [...this.rulesIndex.values()].map(r => r.toString()).sort(),
-      securecookies: [...this.securecookiesIndex.values()].map(s => s.toString()).sort(),
+      targets: [...this.targetsIndex.values()].map((t) => t.toString()).sort(),
+      exclusions: [...this.exclusionsIndex.values()]
+        .map((e) => e.toString())
+        .sort(),
+      rules: [...this.rulesIndex.values()].map((r) => r.toString()).sort(),
+      securecookies: [...this.securecookiesIndex.values()]
+        .map((s) => s.toString())
+        .sort(),
     };
   }
 

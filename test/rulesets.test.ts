@@ -21,10 +21,10 @@ describe('#RuleSets', () => {
     const rules: string[] = [];
     const securecookies: string[] = [];
     for (const ruleset of rulesets) {
-      exclusions.push(...ruleset.exclusions.map(e => e.toString()));
-      rules.push(...ruleset.rules.map(r => r.toString()));
-      securecookies.push(...ruleset.securecookies.map(s => s.toString()));
-      targets.push(...ruleset.targets.map(t => t.toString()));
+      exclusions.push(...ruleset.exclusions.map((e) => e.toString()));
+      rules.push(...ruleset.rules.map((r) => r.toString()));
+      securecookies.push(...ruleset.securecookies.map((s) => s.toString()));
+      targets.push(...ruleset.targets.map((t) => t.toString()));
     }
     targets.sort();
     exclusions.sort();
