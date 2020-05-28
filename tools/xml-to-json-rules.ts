@@ -70,7 +70,11 @@ function* iter<T>(
 
   const rulesets: RuleSetObj[] = [];
 
-  const baseDir = join(__dirname, '..', 'https-everywhere/src/chrome/content/rules/');
+  const baseDir = join(
+    __dirname,
+    '..',
+    'https-everywhere/src/chrome/content/rules/',
+  );
   for (const file of readdirSync(baseDir)) {
     if (file.endsWith('.xml')) {
       const {
