@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import { toASCII } from 'punycode';
 
 import { parse } from 'fast-xml-parser';
 
@@ -76,8 +77,8 @@ function* iter<T>(
     if (file.endsWith('.xml')) {
       const {
         ruleset: {
+          platform,
           default_off,
-          note,
           name,
           target: targets,
           exclusion: exclusions,
@@ -88,15 +89,18 @@ function* iter<T>(
       } = parseRuleSet(join(baseDir, file));
 
       if (default_off !== undefined) {
-        console.log('Skip', name);
+        console.log('Skip (off)', name);
+        continue;
+      }
+
+      if (platform === 'mixedcontent') {
+        console.log('Skip (mixed)', name);
         continue;
       }
 
       const ruleset: RuleSetObj = {
-        name,
+        name: toASCII(name),
         defaultState: true,
-        scope: '',
-        note,
 
         targets: [],
         rules: [],

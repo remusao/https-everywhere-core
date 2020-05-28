@@ -19,13 +19,17 @@ export class RuleSets {
     const securecookies: SecureCookie[] = [];
     const targets: Target[] = [];
 
+    let metaSize = 0;
     for (const ruleset of rulesets) {
+      metaSize += ruleset.getSerializedSize();
       exclusions.push(...ruleset.exclusions);
       rules.push(...ruleset.rules);
       securecookies.push(...ruleset.securecookies);
       targets.push(...ruleset.targets);
     }
+    console.log('META SIZE', metaSize);
 
+    // TODO - we should store the ruleset metadata?
     return new RuleSets(
       {
         targets,
@@ -110,7 +114,6 @@ export class RuleSets {
     this.compression = compression;
 
     if (config.tradeMemoryForUncertainty) {
-      console.time('FOO');
       const plainTargets: [string, number][] = [];
       const wildcardTargets: Target[] = [];
       for (const target of targets) {
@@ -121,17 +124,12 @@ export class RuleSets {
         }
       }
 
-      console.time('index');
       this.targetsIndex = new Index(
         wildcardTargets,
         Target.deserialize,
         this.compression,
       );
-      console.timeEnd('index');
-      console.time('hashes');
       this.targetsHashes = new Hashes(plainTargets);
-      console.timeEnd('hashes');
-      console.timeEnd('FOO');
     } else {
       this.targetsIndex = new Index(
         targets,
@@ -152,6 +150,15 @@ export class RuleSets {
       SecureCookie.deserialize,
       this.compression,
     );
+  }
+
+  toRuleSets(): { targets: string[]; exclusions: string[]; rules: string[]; securecookies: string[]; } {
+    return {
+      targets: [...this.targetsIndex.values()].map(t => t.toString()).sort(),
+      exclusions: [...this.exclusionsIndex.values()].map(e => e.toString()).sort(),
+      rules: [...this.rulesIndex.values()].map(r => r.toString()).sort(),
+      securecookies: [...this.securecookiesIndex.values()].map(s => s.toString()).sort(),
+    };
   }
 
   getSerializedSize(): number {

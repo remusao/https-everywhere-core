@@ -3,12 +3,11 @@ import { Rule, RuleObj } from './rule';
 import { Exclusion, ExclusionObj } from './exclusion';
 import { SecureCookie, SecureCookieObj } from './secure-cookie';
 import { Test, TestObj } from './test';
+import { sizeOfASCII } from './data-view';
 
 export interface RuleSetObj {
   name: string;
   defaultState: boolean;
-  scope: any;
-  note: string;
   exclusions: ExclusionObj[];
   rules: RuleObj[];
   securecookies: SecureCookieObj[];
@@ -21,8 +20,6 @@ export class RuleSet implements RuleSetObj {
     {
       name,
       defaultState,
-      scope,
-      note,
       exclusions,
       rules,
       securecookies,
@@ -31,7 +28,7 @@ export class RuleSet implements RuleSetObj {
     }: RuleSetObj,
     id: number,
   ): RuleSet {
-    const ruleset = new RuleSet(name, id, defaultState, scope, note);
+    const ruleset = new RuleSet(name, id, defaultState);
 
     ruleset.targets.push(
       ...targets.map((target) => Target.fromObj(target, id)),
@@ -67,14 +64,8 @@ export class RuleSet implements RuleSetObj {
     this.active = defaultState;
   }
 
-  public getId(): number {
-    let hash = 7907;
-
-    for (let i = 0; i < this.name.length; i += 1) {
-      hash = (hash * 33) ^ this.name.charCodeAt(i);
-    }
-
-    return hash >>> 0;
+  public getSerializedSize(): number {
+    return sizeOfASCII(this.name) + 1;
   }
 
   // NOTE: Currently, the ID of a ruleset is only defined based on its 'name'

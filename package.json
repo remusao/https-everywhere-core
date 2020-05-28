@@ -6,6 +6,7 @@
   "scripts": {
     "test": "nyc mocha --config ./.mocharc.js",
     "generate-codebooks": "concurrently -n build: npm:codebook-*",
+    "codebook-meta": "ts-node --project ./tools/tsconfig.json ./tools/generate_compression_codebooks.ts -- meta",
     "codebook-targets": "ts-node --project ./tools/tsconfig.json ./tools/generate_compression_codebooks.ts -- targets",
     "codebook-exclusions": "ts-node --project ./tools/tsconfig.json ./tools/generate_compression_codebooks.ts -- exclusions",
     "codebook-securecookies": "ts-node --project ./tools/tsconfig.json ./tools/generate_compression_codebooks.ts -- securecookies",

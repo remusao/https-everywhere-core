@@ -51,18 +51,26 @@ function getSecureCookies(): string[] {
   return strings;
 }
 
+function getRuleSetMeta(): string[] {
+  const strings: string[] = [];
+  for (const { name } of loadRuleSets()) {
+    strings.push(name);
+  }
+  return strings;
+}
+
 function getStrings(kind: string): string[] {
   switch (kind) {
     case 'targets':
       return getTargets();
     case 'exclusions':
       return getExclusions();
-    case 'securecookies': {
+    case 'securecookies':
       return getSecureCookies();
-    }
-    case 'rules': {
+    case 'rules':
       return getRules();
-    }
+    case 'meta':
+      return getRuleSetMeta();
     default:
       throw new Error(`Unsupported codebook: ${kind}`);
   }
@@ -105,9 +113,9 @@ function validateCodebook(codebook: string[], strings: string[]): void {
 function generateCodebook(kind: string): string[] {
   const strings = getStrings(kind);
   console.log(`Generate codebook ${kind} using ${strings.length} strings.`);
-  const codebook = generate(strings, {
-    maxNgram: 65,
-  });
+  const codebook = generate(strings); // , {
+  //   maxNgram: 65,
+  // });
   validateCodebook(codebook, strings);
   return codebook;
 }
