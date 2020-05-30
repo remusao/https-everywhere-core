@@ -15,18 +15,30 @@ async function init(): Promise<RuleSets> {
 async function update(): Promise<RuleSets> {
   console.time('Update engine');
   console.time('Fetch update');
-  const serialized = await (
+  const serialized = new Uint8Array(await (
     await fetch(
       'https://raw.githubusercontent.com/remusao/https-everywhere-core/master/engine.bin',
     )
-  ).arrayBuffer();
+  ).arrayBuffer());
   console.timeEnd('Fetch update');
   console.time('Deserialize update');
   console.timeEnd('Deserialize update');
   await set('engine', serialized);
   console.timeEnd('Update engine');
-  return RuleSets.deserialize(new Uint8Array(serialized));
+  return RuleSets.deserialize(serialized);
 }
+
+setTimeout(async () => {
+  console.log('START BENCH...');
+  const urls = await (await fetch(chrome.runtime.getURL('urls.json'))).json();
+  const t0 = Date.now();
+  const engine = await init();
+  for (const url of urls) {
+    engine.rewriteToSecureRequest(url);
+  }
+  const t1 = Date.now();
+  console.log('Total time matching', t1 - t0, '->', (t1 - t0) / urls.length, 'milliseconds per run');
+}, 15000);
 
 (async () => {
   console.time('Initialize badge');
@@ -49,6 +61,11 @@ async function update(): Promise<RuleSets> {
     engine = await update();
   }, 5000);
 
+  // DISCLAIMER: The following code used as part of the onBeforeRequest
+  // webRequest listener and onChanged cookies listener are taken from the HTTPS
+  // Everywhere project: https://github.com/EFForg/https-everywhere/blob/master/chromium/background-scripts/background.js
+  // The intent was to demonstrate the use of the new matching engine as an
+  // almost drop-in replacement for the currently in use matching logic.
   chrome.webRequest.onBeforeRequest.addListener(
     (details) => {
       const rewritten = engine.rewriteToSecureRequest(details.url);

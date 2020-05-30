@@ -1,6 +1,6 @@
 import { StaticDataView } from './data-view';
 import { extractHostname } from './url';
-import { fastHash, tokenizeInPlace, tokenize } from './utils';
+import { fastHash, tokenizeInPlace, tokenizeHostname } from './utils';
 import { Target } from './target';
 import { Rule } from './rule';
 import { Exclusion } from './exclusion';
@@ -19,15 +19,12 @@ export class RuleSets {
     const securecookies: SecureCookie[] = [];
     const targets: Target[] = [];
 
-    let metaSize = 0;
     for (const ruleset of rulesets) {
-      metaSize += ruleset.getSerializedSize();
       exclusions.push(...ruleset.exclusions);
       rules.push(...ruleset.rules);
       securecookies.push(...ruleset.securecookies);
       targets.push(...ruleset.targets);
     }
-    console.log('META SIZE', metaSize);
 
     // TODO - we should store the ruleset metadata?
     return new RuleSets(
@@ -238,7 +235,6 @@ export class RuleSets {
   }
 
   rewriteToSecureRequest(url: string): string | null {
-    // TODO - try to share as much logic as possible with `match`.
     if (url.startsWith('https:')) {
       return null;
     }
@@ -249,12 +245,12 @@ export class RuleSets {
       return null;
     }
 
-    const tokens = new Uint32Array(hostname.split('.').map(fastHash));
+    const tokens = tokenizeHostname(hostname);
     const rulesets = this.potentiallyApplicableRulesets(hostname, tokens);
 
     if (rulesets.size !== 0) {
       this.exclusionsIndex.iter(
-        tokenize(url, false, false),
+        new Uint32Array([...rulesets]),
         (exclusion: Exclusion) => {
           if (rulesets.has(exclusion.ruleset) && exclusion.match(url)) {
             rulesets.delete(exclusion.ruleset);
@@ -275,62 +271,6 @@ export class RuleSets {
     }
 
     return null;
-  }
-
-  match(url: string) {
-    const result: {
-      rulesets: Set<number>;
-      exclusions: Exclusion[];
-      rules: Rule[];
-      rewritten: string[];
-    } = {
-      rulesets: new Set(),
-      exclusions: [],
-      rules: [],
-      rewritten: [],
-    };
-
-    if (url.startsWith('https:')) {
-      return result;
-    }
-
-    // TODO - handle IPs?
-    const hostname = extractHostname(url);
-    if (hostname === null) {
-      return result;
-    }
-
-    const tokens = new Uint32Array(hostname.split('.').map(fastHash));
-    const rulesets = this.potentiallyApplicableRulesets(hostname, tokens);
-    for (const ruleset of rulesets) {
-      result.rulesets.add(ruleset);
-    }
-
-    if (rulesets.size !== 0) {
-      this.exclusionsIndex.iter(
-        tokenize(url, false, false),
-        (exclusion: Exclusion) => {
-          if (rulesets.has(exclusion.ruleset) && exclusion.match(url)) {
-            result.exclusions.push(exclusion);
-          }
-          return true;
-        },
-      );
-
-      // Do we still have a ruleset after applying exclusions?
-      if (rulesets.size !== 0) {
-        this.rulesIndex.iter(new Uint32Array([...rulesets]), (rule: Rule) => {
-          const rewritten = rule.rewrite(url);
-          if (rewritten !== null) {
-            result.rewritten.push(rewritten);
-            result.rules.push(rule);
-          }
-          return true;
-        });
-      }
-    }
-
-    return result;
   }
 
   public shouldSecureCookie(cookie: Cookie): boolean {

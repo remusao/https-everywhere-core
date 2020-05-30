@@ -1,10 +1,8 @@
-import { readFileSync } from 'fs';
-import { join } from 'path';
-
 import { expect } from 'chai';
 import 'mocha';
 
-import { loadRuleSets } from './utils';
+import { loadRuleSets, loadRuleSetsObjects } from './utils';
+import { RuleSets as HttpsEverywhereRuleSets } from './https-everywhere';
 
 import { Config } from '../src/config';
 import { RuleSets } from '../src/rulesets';
@@ -13,7 +11,6 @@ describe('#RuleSets', () => {
   const rulesets = loadRuleSets();
 
   it('#serialize/#deserialize/#getSerializedSize', () => {
-    // TODO - test for all values of Config
     const engine = RuleSets.fromRuleSets(rulesets, new Config());
 
     const targets: string[] = [];
@@ -52,45 +49,30 @@ describe('#RuleSets', () => {
     });
   });
 
-  // TODO - how do the built-in tests work? Seems like they do not necessarily
-  // TODO - maybe generate a set of tests once and for all?
-  // TODO - then re-use when all rulesets are loaded at once.
-  // trigger exclusion/rule?
   describe('#match', function () {
     this.timeout(20000);
-    const cases: {
-      url: string;
-      rulesets: number[];
-      exclusions: string[];
-      rules: string[];
-      rewritten: string[];
-    }[] = JSON.parse(
-      readFileSync(join(__dirname, 'data', 'cases.json'), 'utf-8'),
-    );
-    for (const tradeMemoryForUncertainty of [false, true]) {
-      it(`tradeMemoryForUncertainty=${tradeMemoryForUncertainty}`, () => {
-        const engine = RuleSets.fromRuleSets(
-          rulesets,
-          new Config({ tradeMemoryForUncertainty }),
-        );
-        for (const testcase of cases) {
-          const match = engine.match(testcase.url);
-          expect([...match.rulesets].sort(), testcase.url).to.eql(
-            testcase.rulesets,
-          );
-          expect(
-            [...new Set(match.exclusions.map((e) => e.toString()).sort())],
-            testcase.url,
-          ).to.eql(testcase.exclusions);
-          expect(
-            match.rules.map((r) => r.toString()).sort(),
-            testcase.url,
-          ).to.eql(testcase.rules);
-          expect(match.rewritten.sort(), testcase.url).to.eql(
-            testcase.rewritten,
-          );
-        }
+    const httpsRuleSets = new HttpsEverywhereRuleSets();
+    for (const ruleset of loadRuleSetsObjects()) {
+      httpsRuleSets.parseOneJsonRuleset({
+        name: ruleset.name,
+        rule: ruleset.rules,
+        exclusion: ruleset.exclusions.map(({ pattern }) => pattern),
+        securecookie: ruleset.securecookies,
+        target: ruleset.targets.map(({ host }) => host),
       });
+    }
+
+    const engine = RuleSets.fromRuleSets(
+      rulesets,
+      new Config({ tradeMemoryForUncertainty: false }),
+    );
+
+    for (const ruleset of rulesets) {
+      for (const { url } of ruleset.tests) {
+        expect(engine.rewriteToSecureRequest(url), url).to.equal(
+          httpsRuleSets.rewriteToSecureRequest(url),
+        );
+      }
     }
   });
 });

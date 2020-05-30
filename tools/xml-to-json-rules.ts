@@ -18,8 +18,8 @@ type Node = {
   };
 };
 
-function parseRuleSet(path: string): any {
-  return parse(readFileSync(path, 'utf-8'), {
+function parseRuleSet(ruleset: string): any {
+  return parse(ruleset, {
     attributeNamePrefix: '',
     ignoreAttributes: false,
     ignoreNameSpace: false,
@@ -30,6 +30,19 @@ function parseRuleSet(path: string): any {
     parseTrueNumberOnly: false,
     arrayMode: false,
   });
+}
+
+export function* iterXmlRuleSets(): IterableIterator<string> {
+  const baseDir = join(
+    __dirname,
+    '..',
+    'https-everywhere/src/chrome/content/rules/',
+  );
+  for (const file of readdirSync(baseDir)) {
+    if (file.endsWith('.xml')) {
+      yield readFileSync(join(baseDir, file), 'utf-8');
+    }
+  }
 }
 
 function* iter<T>(
@@ -70,73 +83,70 @@ function* iter<T>(
 
   const rulesets: RuleSetObj[] = [];
 
-  const baseDir = join(__dirname, '..', 'https-everywhere/src/chrome/content/rules/');
-  for (const file of readdirSync(baseDir)) {
-    if (file.endsWith('.xml')) {
-      const {
-        ruleset: {
-          platform,
-          default_off,
-          name,
-          target: targets,
-          exclusion: exclusions,
-          rule: rules,
-          securecookie: securecookies,
-          test: tests,
-        },
-      } = parseRuleSet(join(baseDir, file));
+  for (const rulesetXml of iterXmlRuleSets()) {
+    const {
+      ruleset: {
+        platform,
+        default_off,
+        name,
+        target: targets,
+        exclusion: exclusions,
+        rule: rules,
+        securecookie: securecookies,
+        test: tests,
+      },
+    } = parseRuleSet(rulesetXml);
 
-      if (default_off !== undefined) {
-        console.log('Skip (off)', name);
-        continue;
-      }
-
-      if (platform === 'mixedcontent') {
-        console.log('Skip (mixed)', name);
-        continue;
-      }
-
-      const ruleset: RuleSetObj = {
-        name: toASCII(name),
-        defaultState: true,
-
-        targets: [],
-        rules: [],
-        exclusions: [],
-        securecookies: [],
-        tests: [],
-      };
-
-      for (const target of iter<TargetObj>(targets, TARGET_ATTRS)) {
-        ruleset.targets.push(target);
-
-        // Generate implicit test cases from targets
-        if (target.host.includes('*') === false) {
-          ruleset.tests.push({ url: `http://${target.host}/` });
-        }
-      }
-
-      for (const exclusion of iter<ExclusionObj>(exclusions, EXCLUSION_ATTRS)) {
-        ruleset.exclusions.push(exclusion);
-      }
-
-      for (const rule of iter<RuleObj>(rules, RULE_ATTRS)) {
-        ruleset.rules.push(rule);
-      }
-
-      for (const securecookie of iter<SecureCookieObj>(
-        securecookies,
-        SECURE_COOKIE_ATTRS,
-      )) {
-        ruleset.securecookies.push(securecookie);
-      }
-
-      for (const test of iter<TestObj>(tests, TEST_ATTRS)) {
-        ruleset.tests.push(test);
-      }
-
-      rulesets.push(ruleset);
+    if (default_off !== undefined) {
+      console.log('Skip (off)', name);
+      continue;
     }
+
+    if (platform === 'mixedcontent') {
+      console.log('Skip (mixed)', name);
+      continue;
+    }
+
+    const ruleset: RuleSetObj = {
+      name: toASCII(name),
+      defaultState: true,
+
+      targets: [],
+      rules: [],
+      exclusions: [],
+      securecookies: [],
+      tests: [],
+    };
+
+    for (const target of iter<TargetObj>(targets, TARGET_ATTRS)) {
+      ruleset.targets.push(target);
+
+      // Generate implicit test cases from targets
+      if (target.host.includes('*') === false) {
+        ruleset.tests.push({ url: `http://${target.host}/` });
+      }
+    }
+
+    for (const exclusion of iter<ExclusionObj>(exclusions, EXCLUSION_ATTRS)) {
+      ruleset.exclusions.push(exclusion);
+    }
+
+    for (const rule of iter<RuleObj>(rules, RULE_ATTRS)) {
+      ruleset.rules.push(rule);
+    }
+
+    for (const securecookie of iter<SecureCookieObj>(
+      securecookies,
+      SECURE_COOKIE_ATTRS,
+    )) {
+      ruleset.securecookies.push(securecookie);
+    }
+
+    for (const test of iter<TestObj>(tests, TEST_ATTRS)) {
+      ruleset.tests.push(test);
+    }
+
+    rulesets.push(ruleset);
   }
 
   writeFileSync(

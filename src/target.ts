@@ -45,10 +45,16 @@ export class Target implements Indexable, TargetObj {
 
     // Handle leading wildcard
     if (this.host.startsWith('*.')) {
-      const start = hostname.indexOf(this.host.slice(2));
-      if (start === -1 || start === 0) {
+      const host = this.host.slice(2);
+      const start = hostname.indexOf(host);
+
+      if (start === -1 || start === 0 || (hostname.length - start) !== host.length) {
         return false;
       }
+
+      // ax.phobos.apple.com.edgesuite.net
+      //  *.phobos.apple.com
+      //    ^ start = 3
 
       return hostname[start - 1] === '.';
     }

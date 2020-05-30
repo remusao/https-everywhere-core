@@ -3,12 +3,21 @@ import { resolve, join } from 'path';
 import { generate } from '@remusao/smaz-generate';
 import { Smaz } from '@remusao/smaz';
 
-import { RuleSetObj } from '../src/ruleset';
+import { RuleSetObj, RuleSet } from '../src/ruleset';
 
-function loadRuleSets(): RuleSetObj[] {
+function loadRuleSetsObjects(): RuleSetObj[] {
   return JSON.parse(
     readFileSync(resolve(join(__dirname, '..', 'rulesets.json')), 'utf-8'),
   );
+}
+
+function loadRuleSets(): RuleSet[] {
+  let id = 1;
+  const rulesets: RuleSet[] = [];
+  for (const ruleset of loadRuleSetsObjects()) {
+    rulesets.push(RuleSet.fromObj(ruleset, id++));
+  }
+  return rulesets;
 }
 
 function getTargets(): string[] {
@@ -34,9 +43,7 @@ function getRules(): string[] {
 function getExclusions(): string[] {
   const strings: string[] = [];
   for (const { exclusions } of loadRuleSets()) {
-    for (const { pattern } of exclusions) {
-      strings.push(pattern);
-    }
+    strings.push(exclusions.map(({ pattern }) => pattern).join('|'));
   }
   return strings;
 }
@@ -113,9 +120,9 @@ function validateCodebook(codebook: string[], strings: string[]): void {
 function generateCodebook(kind: string): string[] {
   const strings = getStrings(kind);
   console.log(`Generate codebook ${kind} using ${strings.length} strings.`);
-  const codebook = generate(strings); // , {
-  //   maxNgram: 65,
-  // });
+  const codebook = generate(strings, {
+    maxNgram: 200,
+  });
   validateCodebook(codebook, strings);
   return codebook;
 }

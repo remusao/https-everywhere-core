@@ -3,7 +3,6 @@ import 'mocha';
 
 import { loadExclusions } from './utils';
 
-import { fastHash } from '../src/utils';
 import { Compression } from '../src/compression';
 import { StaticDataView } from '../src/data-view';
 import { Exclusion } from '../src/exclusion';
@@ -46,20 +45,9 @@ describe('#Exclusion', () => {
   });
 
   it('#getTokens', () => {
-    for (const [pattern, tokens] of [
-      ['', []],
-      ['foo', []],
-      ['foo$', []],
-      ['^foo', []],
-      ['^foo$', ['foo']],
-      ['^foo/bar$', ['foo', 'bar']],
-      ['^http://foo/bar$', ['http', 'foo', 'bar']],
-      ['^http://foo/bar|baz$', []],
-      ['^http://foo/bar|baz$', []],
-      ['^http|https://(?:foo)/bar$', []],
-    ] as [string, string[]][]) {
-      expect(new Exclusion(pattern, 42).getTokens(), pattern).to.eql(
-        new Uint32Array(tokens.map(fastHash)),
+    for (const exclusion of exclusions) {
+      expect(exclusion.getTokens()).to.eql(
+        new Uint32Array([exclusion.ruleset]),
       );
     }
   });

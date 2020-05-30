@@ -1,7 +1,5 @@
 import { StaticDataView, sizeOfExclusion, sizeOfRuleSetID } from './data-view';
 import { Compression } from './compression';
-import { tokenizeRegexInPlace } from './utils';
-import { TOKENS_BUFFER } from './tokens-buffer';
 import { Indexable } from './reverse-index';
 
 export interface ExclusionObj {
@@ -40,10 +38,7 @@ export class Exclusion implements Indexable, ExclusionObj {
   }
 
   getTokens(): Uint32Array {
-    // TODO - add ruleset ID in tokens
-    TOKENS_BUFFER.reset();
-    tokenizeRegexInPlace(this.pattern, TOKENS_BUFFER);
-    return TOKENS_BUFFER.slice();
+    return new Uint32Array([this.ruleset]);
   }
 
   match(url: string): boolean {

@@ -10,7 +10,7 @@ import { SecureCookie } from '../src/secure-cookie';
 
 export function loadRuleSetsObjects(): RuleSetObj[] {
   return JSON.parse(
-    readFileSync(resolve(join(__dirname, 'data', 'rulesets.json')), 'utf-8'),
+    readFileSync(resolve(join(__dirname, '..', 'rulesets.json')), 'utf-8'),
   );
 }
 

@@ -30,18 +30,35 @@ export class RuleSet implements RuleSetObj {
   ): RuleSet {
     const ruleset = new RuleSet(name, id, defaultState);
 
+    if (exclusions.length !== 0) {
+      if (exclusions.length === 1) {
+        ruleset.exclusions.push(Exclusion.fromObj(exclusions[0], id));
+      } else {
+        ruleset.exclusions.push(
+          Exclusion.fromObj(
+            {
+              pattern: exclusions
+                .map(({ pattern }) => `(?:${pattern})`)
+                .join('|'),
+            },
+            id,
+          ),
+        );
+      }
+    }
+
     ruleset.targets.push(
       ...targets.map((target) => Target.fromObj(target, id)),
     );
-    ruleset.exclusions.push(
-      ...exclusions.map((exclusion) => Exclusion.fromObj(exclusion, id)),
-    );
+
     ruleset.rules.push(...rules.map((rule) => Rule.fromObj(rule, id)));
+
     ruleset.securecookies.push(
       ...securecookies.map((securecookie) =>
         SecureCookie.fromObj(securecookie, id),
       ),
     );
+
     ruleset.tests.push(...tests.map((test) => Test.fromObj(test, id)));
 
     return ruleset;
@@ -58,8 +75,6 @@ export class RuleSet implements RuleSetObj {
     public readonly name: string,
     public readonly id: number,
     public readonly defaultState: boolean = true,
-    public readonly scope: any = '',
-    public readonly note: string = '',
   ) {
     this.active = defaultState;
   }
@@ -67,29 +82,4 @@ export class RuleSet implements RuleSetObj {
   public getSerializedSize(): number {
     return sizeOfASCII(this.name) + 1;
   }
-
-  // NOTE: Currently, the ID of a ruleset is only defined based on its 'name'
-  // attribute. Ideally, we would probably want the ID to be a function of all
-  // components, so that it can be used as an equivalence check.
-  // public getId(): number {
-  //   let hash = (7907 * 33) ^ super.getId();
-  //
-  //   for (const exclusion of this.exclusions) {
-  //     hash = (hash * 33) ^ exclusion.getId();
-  //   }
-  //
-  //   for (const rule of this.rules) {
-  //     hash = (hash * 33) ^ rule.getId();
-  //   }
-  //
-  //   for (const securecookie of this.securecookies) {
-  //     hash = (hash * 33) ^ securecookie.getId();
-  //   }
-  //
-  //   for (const target of this.targets) {
-  //     hash = (hash * 33) ^ target.getId();
-  //   }
-  //
-  //   return hash >>> 0;
-  // }
 }

@@ -43,7 +43,6 @@ export class Rule implements Indexable, RuleObj {
   }
 
   getTokens(): Uint32Array {
-    // TODO - tokenize 'from' as well here.
     return new Uint32Array([this.ruleset]);
   }
 
