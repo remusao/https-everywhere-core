@@ -73,7 +73,11 @@ describe('#Target', () => {
     });
 
     it('match with leading wildcard target should be suffix match', () => {
-      expect(new Target('*.phobos.apple.com', 42).match('ax.phobos.apple.com.edgesuite.net')).to.be.false;
+      expect(
+        new Target('*.phobos.apple.com', 42).match(
+          'ax.phobos.apple.com.edgesuite.net',
+        ),
+      ).to.be.false;
     });
 
     it('real targets', () => {

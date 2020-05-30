@@ -27,11 +27,7 @@ export function isAlpha(ch: number): boolean {
 }
 
 function isAllowedCode(ch: number): boolean {
-  return (
-    isAlpha(ch) ||
-    isDigit(ch) ||
-    ch === 37 /* '%' */
-  );
+  return isAlpha(ch) || isDigit(ch) || ch === 37 /* '%' */;
 }
 
 export function tokenizeInPlace(

@@ -176,12 +176,12 @@ export class RuleSets {
   public readonly targets: Map<string, RuleSet[]> = new Map();
 
   parseOneJsonRuleset(ruletag: {
-        name: string;
-        rule: { from: string; to: string; }[];
-        exclusion: string[];
-        securecookie: { host: string; name: string; }[];
-        target: string[];
-      }): void {
+    name: string;
+    rule: { from: string; to: string }[];
+    exclusion: string[];
+    securecookie: { host: string; name: string }[];
+    target: string[];
+  }): void {
     const ruleset = new RuleSet(ruletag.name, true);
 
     const rules = ruletag.rule;
@@ -226,16 +226,15 @@ export class RuleSets {
     let results;
     // Let's begin search
     const rulesets = this.targets.get(host);
-    results = rulesets !== undefined
-      ? new Set([...rulesets])
-      : new Set();
+    results = rulesets !== undefined ? new Set([...rulesets]) : new Set();
 
     const expressions = getWildcardExpressions(host);
     for (const expression of expressions) {
-      const rulesetsForExpression = this.targets.get(expression)
-      results = rulesetsForExpression !== undefined
-        ? new Set([...results, ...rulesetsForExpression])
-        : results;
+      const rulesetsForExpression = this.targets.get(expression);
+      results =
+        rulesetsForExpression !== undefined
+          ? new Set([...results, ...rulesetsForExpression])
+          : results;
     }
 
     // Clean the results list, which may contain duplicates or undefined entries
@@ -257,10 +256,7 @@ export class RuleSets {
    * @param cookie The cookie to test
    * @returns {*} true or false
    */
-  shouldSecureCookie(cookie: {
-    name: string;
-    domain: string;
-  }): boolean {
+  shouldSecureCookie(cookie: { name: string; domain: string }): boolean {
     let hostname = cookie.domain;
     // cookie domain scopes can start with .
     while (hostname.charAt(0) === '.') {
@@ -341,9 +337,7 @@ export class RuleSets {
     // whether to use mozilla's upgradeToSecure BlockingResponse if available
     let newuristr = null;
 
-    const potentiallyApplicable = this.potentiallyApplicableRulesets(
-      hostname,
-    );
+    const potentiallyApplicable = this.potentiallyApplicableRulesets(hostname);
 
     for (const ruleset of potentiallyApplicable) {
       newuristr = ruleset.apply(url);

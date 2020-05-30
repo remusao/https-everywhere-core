@@ -48,7 +48,11 @@ export class Target implements Indexable, TargetObj {
       const host = this.host.slice(2);
       const start = hostname.indexOf(host);
 
-      if (start === -1 || start === 0 || (hostname.length - start) !== host.length) {
+      if (
+        start === -1 ||
+        start === 0 ||
+        hostname.length - start !== host.length
+      ) {
         return false;
       }
 
