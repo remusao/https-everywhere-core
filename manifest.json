@@ -6,7 +6,7 @@
   "homepage_url": "https://github.com/remusao/https",
   "author": "remusao",
   "icons": {
-    "128": "./icon-on.png"
+    "128": "./icons/icon-b-0.png"
   },
   "permissions": [
     "webRequest",

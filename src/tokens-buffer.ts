@@ -1,8 +1,7 @@
 /**
  * Thin abstraction around a Uint32Array which allows to push tokens
  * whithout caring for the offset. It is used as a way to avoid multiple
- * allocations while calling tokenization (mostly beneficitial for
- * `NetworkFilter.getTokens()`).
+ * allocations while calling tokenization.
  */
 export class TokensBuffer {
   private readonly buffer: Uint32Array;

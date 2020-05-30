@@ -28,24 +28,19 @@ async function update(): Promise<RuleSets> {
   return RuleSets.deserialize(serialized);
 }
 
-setTimeout(async () => {
-  console.log('START BENCH...');
-  const urls = await (await fetch(chrome.runtime.getURL('urls.json'))).json();
-  const t0 = Date.now();
-  const engine = await init();
-  for (const url of urls) {
-    engine.rewriteToSecureRequest(url);
-  }
-  const t1 = Date.now();
-  console.log('Total time matching', t1 - t0, '->', (t1 - t0) / urls.length, 'milliseconds per run');
-}, 15000);
-
 (async () => {
   console.time('Initialize badge');
   const badge = new Badge({
     badgeTextColor: 'white',
-    iconDisabled: './icon-off.png',
-    iconEnabled: './icon-on.png',
+    badgeBackgroundColor: [102, 102, 102, 255],
+    iconDisabled: './icons/icon-off.png',
+    iconEnabled: [
+      './icons/icon-b-0.png',
+      './icons/icon-b-1.png',
+      './icons/icon-b-2.png',
+      './icons/icon-b-3.png',
+      './icons/icon-b-4.png',
+    ],
   });
   badge.enable();
   console.timeEnd('Initialize badge');

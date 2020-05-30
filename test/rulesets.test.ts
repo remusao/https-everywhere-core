@@ -49,7 +49,7 @@ describe('#RuleSets', () => {
     });
   });
 
-  describe('#match', function () {
+  it('#rewriteToSecureRequest', function () {
     this.timeout(20000);
     const httpsRuleSets = new HttpsEverywhereRuleSets();
     for (const ruleset of loadRuleSetsObjects()) {
@@ -62,16 +62,18 @@ describe('#RuleSets', () => {
       });
     }
 
-    const engine = RuleSets.fromRuleSets(
-      rulesets,
-      new Config({ tradeMemoryForUncertainty: false }),
-    );
+    for (const tradeMemoryForUncertainty of [false, true]) {
+      const engine = RuleSets.fromRuleSets(
+        rulesets,
+        new Config({ tradeMemoryForUncertainty }),
+      );
 
-    for (const ruleset of rulesets) {
-      for (const { url } of ruleset.tests) {
-        expect(engine.rewriteToSecureRequest(url), url).to.equal(
-          httpsRuleSets.rewriteToSecureRequest(url),
-        );
+      for (const ruleset of rulesets) {
+        for (const { url } of ruleset.tests) {
+          expect(engine.rewriteToSecureRequest(url), url).to.equal(
+            httpsRuleSets.rewriteToSecureRequest(url),
+          );
+        }
       }
     }
   });

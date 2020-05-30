@@ -13,10 +13,8 @@ over the years. Currently the performance is as follows:
 * Memory usage:
     * `4.7MB` (4x less than HTTPS Everywhere in Rust/WebAsm).
     * `2.1MB` using the probabilistic data-structure (9x less).
-* Loading rules from XML: `~1 second` (But `2.7 seconds` with JIT disabled).
-* Serialization of the engine: `1.5ms`.
-* Deserialization (i.e. loading from cache): `3ms`.
-* Decision time: `~0.014ms`.
+* Deserialization (i.e. loading from cache): `25ms`.
+* Decision time between `0.0029` and `0.0073ms`.
 
 This is still work-in-progress, though, but the prototype already shows
 promising results and does better than the current core logic of HTTPS

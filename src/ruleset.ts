@@ -3,7 +3,6 @@ import { Rule, RuleObj } from './rule';
 import { Exclusion, ExclusionObj } from './exclusion';
 import { SecureCookie, SecureCookieObj } from './secure-cookie';
 import { Test, TestObj } from './test';
-import { sizeOfASCII } from './data-view';
 
 export interface RuleSetObj {
   name: string;
@@ -77,9 +76,5 @@ export class RuleSet implements RuleSetObj {
     public readonly defaultState: boolean = true,
   ) {
     this.active = defaultState;
-  }
-
-  public getSerializedSize(): number {
-    return sizeOfASCII(this.name) + 1;
   }
 }

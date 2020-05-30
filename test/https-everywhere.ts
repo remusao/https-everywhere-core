@@ -1,3 +1,8 @@
+// NOTE: This file contains code directly taken from HTTPS Everywhere codebase
+// and directly translated to TypeScript. The aim here was to have a reference
+// to validate the behavior of the new engine. Hence, only the JavaScript
+// RuleSets logic was ported.
+
 // Empty iterable singleton to reduce memory usage
 const nullIterable = Object.create(null, {
   [Symbol.iterator]: {

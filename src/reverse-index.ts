@@ -43,50 +43,7 @@ const EMPTY_BUCKET: number = Number.MAX_SAFE_INTEGER >>> 0;
 
 /**
  * The Index is an accelerating data structure which allows finding a
- * subset of the filters given a list of tokens seen in a URL. It is the core
- * of the adblocker's matching capabilities and speed.
- *
- * It has mainly two caracteristics:
- * 1. It is very compact and is able to load fast.
- * 2. It is *very fast* in finding potential candidates.
- *
- * Conceptually, the reverse index dispatches filters in "buckets" (an array of
- * one or more filters). Filters living in the same bucket are guaranteed to
- * share at least one of their tokens (appearing in the pattern). For example:
- *
- *   - Bucket 1 (ads):
- *       - /ads.js
- *       - /script/ads/tracking.js
- *       - /ads/
- *   - Bucket 2 (tracking)
- *       - /tracking.js
- *       - ||tracking.com/cdn
- *
- * We see that filters in "Bucket 1" are indexed using the token "ads" and
- * "Bucket 2" using token "tracking".
- *
- * This property allows to quickly discard most of the filters when we match a
- * URL. To achieve this, the URL is tokenized in the same way filters are
- * tokenized and for each token, we check if there are some filters available.
- *
- * For example:
- *
- *  URL "https://tracking.com/" has the following tokens: "https", "tracking"
- *  and "com". We immediatly see that we only check the two filters in the
- *  "tracking" bucket since they are the only ones having a common token with
- *  the URL.
- *
- * How do we pick the token for each filter?
- * =========================================
- *
- * Each filter is only indexed *once*, which means that we need to pick one of
- * the tokens appearing in the pattern. We choose the token such that each
- * filter is indexed using the token which was the *least seen* globally. In
- * other words, we pick the most discriminative token for each filter. This is
- * done using the following algorithm:
- *   1. Tokenize all the filters which will be stored in the index
- *   2. Compute a histogram of frequency of each token (globally)
- *   3. Select the best token for each filter (lowest frequency)
+ * subset of the rules given a list of tokens seen in a URL.
  */
 export class Index<T extends Indexable> {
   public static deserialize<T extends Indexable>(
@@ -109,7 +66,7 @@ export class Index<T extends Indexable> {
     const tokensLookupIndex = view.getUint32ArrayView(tokensLookupIndexSize);
     const bucketsIndex = view.getUint32ArrayView(bucketsIndexSize);
     const filtersIndexStart = view.pos;
-    view.seekZero(); // not strictly needed but make sure reverse index can be compared with deep equal
+    view.seekZero(); // not strictly needed but make sure index can be compared with deep equal
 
     return new Index([], deserialize, compression).updateInternals({
       bucketsIndex,
@@ -120,7 +77,7 @@ export class Index<T extends Indexable> {
     });
   }
 
-  // Internal, compact representation of the reverse index. It contains three
+  // Internal, compact representation of the index. It contains three
   // distinct parts stored in the same typed array:
   //
   // 1. "tokens lookup index" allows to identify a sub-set of buckets which
@@ -259,7 +216,7 @@ export class Index<T extends Indexable> {
    */
   public iter(tokens: Uint32Array, cb: (value: T) => boolean): void {
     // Each request is assigned an ID so that we can keep track of the last
-    // request seen by each bucket in the reverse index. This provides a cheap
+    // request seen by each bucket in the index. This provides a cheap
     // way to prevent filters from being inspected more than once per request
     // (which could happen if the same token appears more than once in the URL).
     const requestId = getNextId();
@@ -275,7 +232,7 @@ export class Index<T extends Indexable> {
   }
 
   /**
-   * Re-create the internal data-structure of the reverse index *in-place*. It
+   * Re-create the internal data-structure of the index *in-place*. It
    * needs to be called with a list of new filters and optionally a list of ids
    * (as returned by either NetworkFilter.getId() or CosmeticFilter.getId())
    * which need to be removed from the index.
@@ -376,7 +333,7 @@ export class Index<T extends Indexable> {
     estimatedBufferSize += tokensLookupIndexSize * 4;
 
     // At this point we know the number of bytes needed for the compact
-    // representation of this reverse index ("tokens index" + "buckets index" +
+    // representation of this index ("tokens index" + "buckets index" +
     // "filters index"). We allocate it at once and proceed with populating it.
     const buffer = StaticDataView.allocate(
       estimatedBufferSize,

@@ -2,3 +2,4 @@ node_modules
 .nyc_output
 background.bundle.js
 background.bundle.js.map
+web-ext-artifacts

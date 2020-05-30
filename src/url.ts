@@ -1,6 +1,5 @@
 /**
  * @param url - URL we want to extract a hostname from.
- * @param urlIsValidHostname - hint from caller; true if `url` is already a valid hostname.
  */
 export function extractHostname(url: string): string | null {
   let start: number = 0;

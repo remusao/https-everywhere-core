@@ -64,13 +64,6 @@ export function sizeOfASCII(str: string): number {
   return str.length + sizeOfLength(str.length);
 }
 
-/**
- * Return number of bytes needed to serialize `array`.
- */
-export function sizeOfUint32Array(array: Uint32Array): number {
-  return array.byteLength + sizeOfLength(array.length);
-}
-
 export function sizeOfStrings(strings: readonly string[]): number {
   let size = sizeOfLength(strings.length);
   for (const str of strings) {
